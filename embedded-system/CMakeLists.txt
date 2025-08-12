@@ -6,6 +6,7 @@ project(Cardiac-Monitoring-System VERSION 1.0.0 LANGUAGES CXX)
 # C++ standard settings
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Cross-compilation setup for Raspberry Pi 3
 if(CMAKE_CROSSCOMPILING)
@@ -22,20 +23,23 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # Source files
 set(SOURCES
-src/main.cpp
+    src/main.cpp
 )
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 # Header files
-target_include_directories(${PROJECT_NAME} PRIVATE include)
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
 # Compiler flags
 target_compile_options(${PROJECT_NAME} PRIVATE
     -Wall
     -Wextra
-    -O2
+    -Wpedantic
+    #-O2
 )
 
 # Print build information

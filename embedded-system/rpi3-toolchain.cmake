@@ -2,7 +2,7 @@
 
 # Set the system name and processor
 set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSTEM_PROCESSOR arm)
+set(CMAKE_SYSTEM_PROCESSOR aarch64)
 
 # Set the compilers
 set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
