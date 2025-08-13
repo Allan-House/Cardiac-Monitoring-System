@@ -2,7 +2,10 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt update && apt install -y \
+RUN useradd -m -s /bin/bash jonas && \
+    echo "jonas ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+RUN apt update && apt install -y --no-install-recommends \
     build-essential \
     cmake \
     git \
@@ -15,15 +18,7 @@ RUN apt update && apt install -y \
     vim \
     ssh \
     pkg-config \
-    libpigpio-dev:arm64 \
-    libi2c-dev:arm64 \
     && apt clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Cross-compilation environment
-ENV CC=aarch64-linux-gnu-gcc
-ENV CXX=aarch64-linux-gnu-g++
-
-ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
-
-WORKDIR /workspaces/Cardiac-Monitoring-System
+WORKDIR /workspaces/Cardiac-Monitoring-System/embedded-system

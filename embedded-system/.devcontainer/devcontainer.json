@@ -2,7 +2,7 @@
     "name": "RPi3 Cross-Compilation Environment",
     "build": {
         "dockerfile": "Dockerfile",
-        "context": "."
+        "context": ".."
     },
     "customizations": {
         "vscode": {
@@ -18,6 +18,7 @@
             }
         }
     },
-    "workspaceFolder": "/workspaces/Cardiac-Monitoring-System",
+    "remoteUser": "jonas",
+    "workspaceFolder": "/workspaces/Cardiac-Monitoring-System/embedded-system",
     "postCreateCommand": "echo 'Cross-compilation environment ready for RPi3'"
 }
