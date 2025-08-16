@@ -2,6 +2,10 @@
 
 ### Enable I2C
 
+```
+sudo i2cdetect -y 1
+```
+
 ### Docker
 
 ### How to Compile
