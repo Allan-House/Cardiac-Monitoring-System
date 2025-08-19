@@ -7,7 +7,6 @@
 #include <wiringPiI2C.h>
 
 // TODO (allan): verificar valores das constantes (endereços I2C ok)
-// TODO (allan): namespace ou várias enum class?
 namespace ads1115_constants {
   // Endereços I2C possíveis do ADS1115
   enum class Address : uint8_t {
@@ -68,7 +67,7 @@ namespace ads1115_constants {
 
   // Operation mode
   enum class Mode : uint16_t {
-    KContinuous = 0x0000,
+    kContinuous = 0x0000,
     kSingle     = 0x0100 // default
   };
 
@@ -81,19 +80,25 @@ namespace ads1115_constants {
 
 class ADS1115 {
   private:
-  uint8_t i2c_address_ {static_cast<uint8_t>(ads1115_constants::Address::kGND)};
-  int i2c_fd_;
   uint16_t config_register_;
+  uint8_t i2c_address_;
+  int i2c_fd_;
   float voltage_range_;
-  
-  void CalculateVoltageRange();
+  bool initialized_;
+
   uint16_t ReadRegister(uint8_t reg);
   bool WriteRegister(uint8_t reg, uint16_t value);
+  void CalculateVoltageRange();
   
   public:
   ADS1115(uint8_t address = static_cast<uint8_t>(ads1115_constants::Address::kGND));
-  float ConvertToVoltage(int16_t raw_value);
+  ~ADS1115();
+  
   bool Init();
+
+  float ConvertToVoltage(int16_t raw_value);
+  // TODO (allan): função de leitura do ADC
+  // TODO (allan): função para selecionar o canal?
   
   void set_data_rate(ads1115_constants::DataRate data_rate);
   void set_mode(ads1115_constants::Mode mode);

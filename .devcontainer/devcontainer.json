@@ -19,6 +19,6 @@
         }
     },
     "remoteUser": "jonas",
-    "workspaceFolder": "/workspaces/Cardiac-Monitoring-System/embedded-system",
+    "workspaceFolder": "/workspaces/Cardiac-Monitoring-System",
     "postCreateCommand": "echo 'Cross-compilation environment ready for RPi3'"
 }

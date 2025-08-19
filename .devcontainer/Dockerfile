@@ -21,4 +21,4 @@ RUN apt update && apt install -y --no-install-recommends \
     && apt clean \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /workspaces/Cardiac-Monitoring-System/embedded-system
+WORKDIR /workspaces/Cardiac-Monitoring-System

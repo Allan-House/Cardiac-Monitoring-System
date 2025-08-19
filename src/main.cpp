@@ -13,7 +13,7 @@ int main() {
   pinMode(LED, OUTPUT);
 
   while (true) {
-      digitalWrite (LED, HIGH);
+    digitalWrite (LED, HIGH);
     delay (500);
     digitalWrite (LED, LOW);
     delay (500);

@@ -1,0 +1,12 @@
+[
+{
+  "directory": "/workspaces/Cardiac-Monitoring-System/build",
+  "command": "/usr/bin/aarch64-linux-gnu-g++  -I/workspaces/Cardiac-Monitoring-System/include -I/workspaces/Cardiac-Monitoring-System/libs/wiring-pi/include -mcpu=cortex-a53 -O3 -DNDEBUG -Wall -Wextra -Wpedantic -std=c++17 -o CMakeFiles/Cardiac-Monitoring-System.dir/src/main.cpp.o -c /workspaces/Cardiac-Monitoring-System/src/main.cpp",
+  "file": "/workspaces/Cardiac-Monitoring-System/src/main.cpp"
+},
+{
+  "directory": "/workspaces/Cardiac-Monitoring-System/build",
+  "command": "/usr/bin/aarch64-linux-gnu-g++  -I/workspaces/Cardiac-Monitoring-System/include -I/workspaces/Cardiac-Monitoring-System/libs/wiring-pi/include -mcpu=cortex-a53 -O3 -DNDEBUG -Wall -Wextra -Wpedantic -std=c++17 -o CMakeFiles/Cardiac-Monitoring-System.dir/src/ads1115.cpp.o -c /workspaces/Cardiac-Monitoring-System/src/ads1115.cpp",
+  "file": "/workspaces/Cardiac-Monitoring-System/src/ads1115.cpp"
+}
+]
