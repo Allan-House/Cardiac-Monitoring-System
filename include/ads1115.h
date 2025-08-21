@@ -79,6 +79,8 @@ namespace ads1115_constants {
 }
 
 class ADS1115 {
+  static constexpr float kErrorVoltage = -999.0f;
+
   private:
   uint16_t config_register_;
   uint8_t i2c_address_;
@@ -89,6 +91,7 @@ class ADS1115 {
   uint16_t ReadRegister(uint8_t reg);
   bool WriteRegister(uint8_t reg, uint16_t value);
   void CalculateVoltageRange();
+  float ConvertToVoltage(int16_t raw_value);
   
   public:
   ADS1115(uint8_t address = static_cast<uint8_t>(ads1115_constants::Address::kGND));
@@ -96,8 +99,8 @@ class ADS1115 {
   
   bool Init();
 
-  float ConvertToVoltage(int16_t raw_value);
-  // TODO (allan): função de leitura do ADC
+  int16_t ReadRawADC();
+  float ReadVoltage();
   // TODO (allan): função para selecionar o canal?
   
   void set_data_rate(ads1115_constants::DataRate data_rate);

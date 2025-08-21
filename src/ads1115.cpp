@@ -1,17 +1,6 @@
 #include "ads1115.h"
-
-/*
-Checklist
-[X] ReadRegister(uint8_t reg)
-[X] WriteRegister(uint8_t reg, uint16_t value)
-[X] CalculateVoltageRange()
-[X] ConvertToVoltage(int16_t raw_value)
-[ ] ADS1115(uint8_t address)
-[ ] ~ADS1115()
-[ ] Init()
-[ ] ReadRawADC()
-[ ] ReadVoltage()
-*/
+#include <unistd.h>
+#include <wiringPiI2C.h>
 
 /*
 EXEMPLO DE USO DO LOGGER
@@ -72,12 +61,19 @@ ADS1115::ADS1115(uint8_t address) :
 i2c_address_ {address},
 i2c_fd_ {-1},
 initialized_ {false},
+// TODO (allan): check configuration bytes order.
 config_register_ {static_cast<uint16_t>(ads1115_constants::Mux::kA0_GND)       |
                   static_cast<uint16_t>(ads1115_constants::Gain::kFSR_2_048V)  | 
                   static_cast<uint16_t>(ads1115_constants::DataRate::kSPS_128) |
-                  static_cast<uint16_t>(ads1115_constants::Mode::kContinuous)}
+                  static_cast<uint16_t>(ads1115_constants::Mode::kContinuous)},
+voltage_range_ {2.048f}
 {
-  CalculateVoltageRange();
+}
+
+ADS1115::~ADS1115() {
+  if (i2c_fd_ >= 0) {
+    close(i2c_fd_);
+  }
 }
 
 uint16_t ADS1115::ReadRegister(uint8_t reg) {
@@ -136,8 +132,21 @@ float ADS1115::ConvertToVoltage(int16_t raw_value) {
 }
 
 bool ADS1115::Init() {
-  // TODO (allan): tratamento de erro?
-  wiringPiSetup();
+
+  if (initialized_) {
+    std::cout << "ADS1115 already initialized!" << std::endl;
+    return true;
+  }
+
+  if (i2c_fd_ >= 0) {
+    close(i2c_fd_);
+    i2c_fd_ = -1;
+  }
+
+  if (wiringPiSetup() < 0) {
+   std::cerr << "Error initializing WiringPi!" << std::endl;
+  return false;
+  }
   
   i2c_fd_ = wiringPiI2CSetup(i2c_address_);
   if (i2c_fd_ < 0) {
@@ -157,6 +166,28 @@ bool ADS1115::Init() {
   return true;
 }
 
+int16_t ADS1115::ReadRawADC() {
+  if (!initialized_) {
+    std::cerr << "ADS1115 not initialized! Call Init() first." << std::endl;
+    return INT16_MIN;
+  }
+
+  uint16_t raw_data {ReadRegister(static_cast<uint8_t>(
+                     ads1115_constants::Register::kConversion))};
+  return static_cast<int16_t>(raw_data);
+}
+
+float ADS1115::ReadVoltage() {
+  int16_t raw_value {ReadRawADC()};
+
+  if (raw_value == INT16_MIN) {
+    return kErrorVoltage;
+  }
+
+  return ConvertToVoltage(raw_value);
+}
+
+// Setters
 void ADS1115::set_data_rate(ads1115_constants::DataRate data_rate) {
   config_register_ &= ~0x00E0;  // Limpa bits de data rate
   config_register_ |= static_cast<uint16_t>(data_rate);
@@ -164,7 +195,7 @@ void ADS1115::set_data_rate(ads1115_constants::DataRate data_rate) {
 
 void ADS1115::set_gain(ads1115_constants::Gain gain) {
   config_register_ &= ~0x0E00; // Limpa bits de ganho
-  config_register_ |= static_cast<uint16_t>(gain);;
+  config_register_ |= static_cast<uint16_t>(gain);
   CalculateVoltageRange();
 }
 
