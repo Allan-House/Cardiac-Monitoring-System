@@ -106,6 +106,7 @@ class ADS1115 {
   void set_data_rate(ads1115_constants::DataRate data_rate);
   void set_mode(ads1115_constants::Mode mode);
   void set_gain(ads1115_constants::Gain gain);
+  bool set_mux(ads1115_constants::Mux mux);
 };
 
 #endif

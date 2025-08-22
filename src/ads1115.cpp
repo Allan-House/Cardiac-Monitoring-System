@@ -61,11 +61,11 @@ ADS1115::ADS1115(uint8_t address) :
 i2c_address_ {address},
 i2c_fd_ {-1},
 initialized_ {false},
-// TODO (allan): check configuration bytes order.
 config_register_ {static_cast<uint16_t>(ads1115_constants::Mux::kA0_GND)       |
                   static_cast<uint16_t>(ads1115_constants::Gain::kFSR_2_048V)  | 
+                  static_cast<uint16_t>(ads1115_constants::Mode::kContinuous)  |
                   static_cast<uint16_t>(ads1115_constants::DataRate::kSPS_128) |
-                  static_cast<uint16_t>(ads1115_constants::Mode::kContinuous)},
+                  0x0003},
 voltage_range_ {2.048f}
 {
 }
@@ -87,7 +87,7 @@ uint16_t ADS1115::ReadRegister(uint8_t reg) {
   
   if (result < 0) {
     std::cerr << "Error reading register 0x" << std::hex
-    << static_cast<int>(reg) << std::endl;
+              << static_cast<int>(reg) << std::endl;
     return 0xFFFF;
   }
   
@@ -128,7 +128,7 @@ void ADS1115::CalculateVoltageRange() {
 }
 
 float ADS1115::ConvertToVoltage(int16_t raw_value) {
-  return (raw_value * voltage_range_) / 32767.0f;
+  return (raw_value * voltage_range_) / 32768.0f;
 }
 
 bool ADS1115::Init() {
@@ -144,8 +144,8 @@ bool ADS1115::Init() {
   }
 
   if (wiringPiSetup() < 0) {
-   std::cerr << "Error initializing WiringPi!" << std::endl;
-  return false;
+    std::cerr << "Error initializing WiringPi!" << std::endl;
+    return false;
   }
   
   i2c_fd_ = wiringPiI2CSetup(i2c_address_);
@@ -189,17 +189,30 @@ float ADS1115::ReadVoltage() {
 
 // Setters
 void ADS1115::set_data_rate(ads1115_constants::DataRate data_rate) {
-  config_register_ &= ~0x00E0;  // Limpa bits de data rate
+  config_register_ &= ~0x00E0;
   config_register_ |= static_cast<uint16_t>(data_rate);
+  WriteRegister(static_cast<uint8_t>(ads1115_constants::Register::kConfig),
+                config_register_);
 }
 
 void ADS1115::set_gain(ads1115_constants::Gain gain) {
-  config_register_ &= ~0x0E00; // Limpa bits de ganho
+  config_register_ &= ~0x0E00;
   config_register_ |= static_cast<uint16_t>(gain);
   CalculateVoltageRange();
+  WriteRegister(static_cast<uint8_t>(ads1115_constants::Register::kConfig),
+                config_register_);
 }
 
 void ADS1115::set_mode(ads1115_constants::Mode mode) {
-  config_register_ &= ~0x0100;  // Limpa bits de modo
+  config_register_ &= ~0x0100;
   config_register_ |= static_cast<uint16_t>(mode);
+  WriteRegister(static_cast<uint8_t>(ads1115_constants::Register::kConfig),
+                config_register_);
+}
+
+bool ADS1115::set_mux(ads1115_constants::Mux mux) {
+  config_register_ &= ~0x7000;
+  config_register_ |= static_cast<uint16_t>(mux);
+  WriteRegister(static_cast<uint8_t>(ads1115_constants::Register::kConfig),
+                config_register_);
 }
