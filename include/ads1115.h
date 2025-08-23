@@ -85,8 +85,8 @@ class ADS1115 {
   uint16_t config_register_;
   uint8_t i2c_address_;
   int i2c_fd_;
-  float voltage_range_;
   bool initialized_;
+  float voltage_range_;
 
   uint16_t ReadRegister(uint8_t reg);
   bool WriteRegister(uint8_t reg, uint16_t value);

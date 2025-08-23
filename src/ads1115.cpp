@@ -58,14 +58,14 @@ uint16_t ADS1115::ReadRegister(uint8_t reg) {
 */
 
 ADS1115::ADS1115(uint8_t address) :
-i2c_address_ {address},
-i2c_fd_ {-1},
-initialized_ {false},
 config_register_ {static_cast<uint16_t>(ads1115_constants::Mux::kA0_GND)       |
                   static_cast<uint16_t>(ads1115_constants::Gain::kFSR_2_048V)  | 
                   static_cast<uint16_t>(ads1115_constants::Mode::kContinuous)  |
                   static_cast<uint16_t>(ads1115_constants::DataRate::kSPS_128) |
                   0x0003},
+i2c_address_ {address},
+i2c_fd_ {-1},
+initialized_ {false},
 voltage_range_ {2.048f}
 {
 }
@@ -210,7 +210,7 @@ void ADS1115::set_mode(ads1115_constants::Mode mode) {
                 config_register_);
 }
 
-bool ADS1115::set_mux(ads1115_constants::Mux mux) {
+void ADS1115::set_mux(ads1115_constants::Mux mux) {
   config_register_ &= ~0x7000;
   config_register_ |= static_cast<uint16_t>(mux);
   WriteRegister(static_cast<uint8_t>(ads1115_constants::Register::kConfig),

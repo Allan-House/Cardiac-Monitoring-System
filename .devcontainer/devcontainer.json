@@ -9,7 +9,8 @@
             "extensions": [
                 "ms-vscode.cpptools-extension-pack",
                 "ms-vscode.cmake-tools",
-                "ms-azuretools.vscode-docker"
+                "ms-azuretools.vscode-docker",
+                "gruntfuggly.todo-tree"
             ],
             "settings": {
                 "cmake.configureOnOpen": false,

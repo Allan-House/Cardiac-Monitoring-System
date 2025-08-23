@@ -1,3 +1,0 @@
-/workspaces/Cardiac-Monitoring-System/build/CMakeFiles/Cardiac-Monitoring-System.dir
-/workspaces/Cardiac-Monitoring-System/build/CMakeFiles/edit_cache.dir
-/workspaces/Cardiac-Monitoring-System/build/CMakeFiles/rebuild_cache.dir
