@@ -82,7 +82,6 @@ uint16_t ADS1115::ReadRegister(uint8_t reg) {
     return 0xFFFF;
   }
   
-  // TODO (allan): check wiringPiI2CReadReg16 endianness
   int result = wiringPiI2CReadReg16(i2c_fd_, reg);
   
   if (result < 0) {
@@ -101,13 +100,13 @@ bool ADS1115::WriteRegister(uint8_t reg, uint16_t value) {
     return false;
   }
   
-  // TODO (allan): check wiringPiI2CWriteReg16 endianness
+  // WiringPiWriteReg16 expects little-endian, but ADS1115 expects big-endian.
   int result = wiringPiI2CWriteReg16(i2c_fd_, reg, ((value & 0xFF) << 8) |
-  ((value & 0xFF00) >> 8));
+                                                   ((value & 0xFF00) >> 8));
   
   if (result < 0) {
     std::cerr << "Error writing register 0x" << std::hex
-    << static_cast<int>(reg) << std::endl;
+              << static_cast<int>(reg) << std::endl;
     return false;
   }
   
@@ -122,7 +121,9 @@ void ADS1115::CalculateVoltageRange() {
     case ads1115_constants::Gain::kFSR_2_048V: voltage_range_ = 2.048f; break;
     case ads1115_constants::Gain::kFSR_1_024V: voltage_range_ = 1.024f; break;
     case ads1115_constants::Gain::kFSR_0_512V: voltage_range_ = 0.512f; break;
-    case ads1115_constants::Gain::kFSR_0_256V: voltage_range_ = 0.256f; break;
+    case ads1115_constants::Gain::kFSR_0_256V_A: voltage_range_ = 0.256f; break;
+    case ads1115_constants::Gain::kFSR_0_256V_B: voltage_range_ = 0.256f; break;
+    case ads1115_constants::Gain::kFSR_0_256V_C: voltage_range_ = 0.256f; break;
     default: voltage_range_ = 2.048f; break;
     }
 }
@@ -173,7 +174,7 @@ int16_t ADS1115::ReadRawADC() {
   }
 
   uint16_t raw_data {ReadRegister(static_cast<uint8_t>(
-                     ads1115_constants::Register::kConversion))};
+                                  ads1115_constants::Register::kConversion))};
   return static_cast<int16_t>(raw_data);
 }
 
@@ -185,6 +186,33 @@ float ADS1115::ReadVoltage() {
   }
 
   return ConvertToVoltage(raw_value);
+}
+
+uint16_t ADS1115::ReadConfigRegisterFromHardware() {
+  if (!initialized_) {
+    std::cerr << "ADS1115 not initialized! Call Init() first." << std::endl;
+    return 0xFFFF;
+  }
+  
+  return ReadRegister(static_cast<uint8_t>(ads1115_constants::Register::kConfig));
+}
+
+bool ADS1115::VerifyConfigRegister() {
+  uint16_t hardware_value {ReadConfigRegisterFromHardware()};
+  
+  if (hardware_value == 0xFFFF) {
+    return false;
+  }
+  
+  bool match {(hardware_value == config_register_)};
+  
+  if (!match) {
+    std::cout << "Config register mismatch!" << std::endl;
+    std::cout << "  Memory:   0x" << std::hex << config_register_ << std::endl;
+    std::cout << "  Hardware: 0x" << std::hex << hardware_value << std::endl;
+  }
+  
+  return match;
 }
 
 // Setters
