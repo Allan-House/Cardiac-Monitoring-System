@@ -1,4 +1,5 @@
 #include "ads1115.h"
+#include "logger.h"
 #include "ring_buffer.h"
 #include <chrono>
 #include <cstdlib>
@@ -6,39 +7,6 @@
 #include <iostream>
 #include <memory>
 #include <thread>
-
-/*
-#define	LED	0
-
-int main() {
-  cardiac_logger::init("cardiac_system.log", cardiac_logger::Level::INFO);
-
-  LOG_INFO("===================================");
-  LOG_INFO("Cardiac Monitoring System Starting");
-  LOG_INFO("===================================");
-
-  LOG_INFO("Initializing Raspberry Pi GPIO...");
-  wiringPiSetup();
-  pinMode(LED, OUTPUT);
-  LOG_INFO("GPIO initialized successfully");
-
-  while (true) {
-    digitalWrite (LED, HIGH);
-    LOG_DEBUG("LED ON");
-    delay (500);
-
-    digitalWrite (LED, LOW);
-    LOG_DEBUG("LED OFF");
-    delay (500);
-  }
-  
-  cardiac_logger::shutdown();
-
-  return 0;
-}
-*/
-
-
 
 int main() {
   std::cout << "==================================" << std::endl;
@@ -57,8 +25,8 @@ int main() {
   constexpr int kSampleRate = 128;  // SPS
   const auto sample_period = std::chrono::microseconds(1000000 / kSampleRate);
   
-  std::cout << "Starting sampling at " << kSampleRate << " SPS" << std::endl;
-  std::cout << "Sample period: " << sample_period.count() << " μs" << std::endl;
+  LOG_INFO("Starting sampling at %d SPS", kSampleRate);
+  LOG_INFO("Sample period: % μs", sample_period.count());
 
   // Preenche buffer com timing preciso
   auto start_time = std::chrono::high_resolution_clock::now();

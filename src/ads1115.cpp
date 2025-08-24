@@ -2,61 +2,6 @@
 #include <unistd.h>
 #include <wiringPiI2C.h>
 
-/*
-EXEMPLO DE USO DO LOGGER
-TODO: ver como que funciona e aplicar
-
-
-#include "ads1115.h"
-#include "logger.h"  // Add this
-
-bool ADS1115::Init() {
-    LOG_INFO("Initializing ADS1115 at I2C address 0x%02X", i2c_address_);
-    
-    wiringPiSetup();
-    
-    i2c_fd_ = wiringPiI2CSetup(i2c_address_);
-    if (i2c_fd_ < 0) {
-        LOG_ERROR("I2C initialization failed for ADS1115 at 0x%02X", i2c_address_);
-        return false;
-    }
-    
-    LOG_DEBUG("I2C file descriptor: %d", i2c_fd_);
-    
-    uint8_t reg = static_cast<uint8_t>(ads1115_constants::Register::kConfig);
-    bool success = WriteRegister(reg, config_register_);
-    if (!success) {
-        LOG_ERROR("Failed to configure ADS1115 register 0x%02X", reg);
-        return false;
-    }
-    
-    LOG_INFO("ADS1115 initialized successfully - voltage_range=%.3fV", voltage_range_);
-    initialized_ = true;
-    return true;
-}
-
-uint16_t ADS1115::ReadRegister(uint8_t reg) {
-    LOG_TRACE("Reading register 0x%02X", reg);
-    
-    if (i2c_fd_ < 0) {
-        LOG_ERROR("I2C not initialized - cannot read register 0x%02X", reg);
-        return 0xFFFF;
-    }
-    
-    int result = wiringPiI2CReadReg16(i2c_fd_, reg);
-    
-    if (result < 0) {
-        LOG_ERROR("I2C read failed: reg=0x%02X, errno=%d", reg, errno);
-        return 0xFFFF;
-    }
-    
-    uint16_t value = ((result & 0xFF) << 8) | ((result & 0xFF00) >> 8);
-    LOG_DEBUG("Register read successful: reg=0x%02X, value=0x%04X", reg, value);
-    
-    return value;
-}
-*/
-
 ADS1115::ADS1115(uint8_t address) :
 config_register_ {static_cast<uint16_t>(ads1115_constants::Mux::kA0_GND)       |
                   static_cast<uint16_t>(ads1115_constants::Gain::kFSR_2_048V)  | 
