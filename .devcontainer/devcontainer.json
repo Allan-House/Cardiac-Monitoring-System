@@ -4,6 +4,7 @@
         "dockerfile": "Dockerfile",
         "context": ".."
     },
+    "runArgs": ["--hostname=rpi3-dev"],
     "customizations": {
         "vscode": {
             "extensions": [
