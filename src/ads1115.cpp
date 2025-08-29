@@ -13,6 +13,7 @@ i2c_fd_ {-1},
 initialized_ {false},
 voltage_range_ {2.048f}
 {
+  // Empty constructor.
 }
 
 ADS1115::~ADS1115() {
