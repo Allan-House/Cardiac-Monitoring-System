@@ -1,19 +1,20 @@
 #include "ads1115.h"
+#include "logger.h"
 #include <unistd.h>
 #include <wiringPiI2C.h>
 
 ADS1115::ADS1115(uint8_t address) :
 config_register_ {static_cast<uint16_t>(ads1115_constants::Mux::kA0_GND)       |
-                  static_cast<uint16_t>(ads1115_constants::Gain::kFSR_2_048V)  | 
+                  static_cast<uint16_t>(ads1115_constants::Gain::kFSR_4_096V)  | 
                   static_cast<uint16_t>(ads1115_constants::Mode::kContinuous)  |
-                  static_cast<uint16_t>(ads1115_constants::DataRate::kSPS_128) |
+                  static_cast<uint16_t>(ads1115_constants::DataRate::kSPS_250) |
                   0x0003},
 i2c_address_ {address},
 i2c_fd_ {-1},
 initialized_ {false},
 voltage_range_ {2.048f}
 {
-  // Empty constructor.
+  CalculateVoltageRange();
 }
 
 ADS1115::~ADS1115() {
@@ -24,15 +25,14 @@ ADS1115::~ADS1115() {
 
 uint16_t ADS1115::ReadRegister(uint8_t reg) {
   if (i2c_fd_ < 0) {
-    std::cerr << "I2C not initialized!" << std::endl;
+    LOG_ERROR("I2C not initialized!");
     return 0xFFFF;
   }
   
   int result = wiringPiI2CReadReg16(i2c_fd_, reg);
   
   if (result < 0) {
-    std::cerr << "Error reading register 0x" << std::hex
-              << static_cast<int>(reg) << std::endl;
+    LOG_ERROR("Error reading register 0x%02X", static_cast<int>(reg));
     return 0xFFFF;
   }
   
@@ -42,7 +42,7 @@ uint16_t ADS1115::ReadRegister(uint8_t reg) {
 
 bool ADS1115::WriteRegister(uint8_t reg, uint16_t value) {
   if (i2c_fd_ < 0) {
-    std::cerr << "I2C not initialized!" << std::endl;
+    LOG_ERROR("I2C not initialized!");
     return false;
   }
   
@@ -51,8 +51,7 @@ bool ADS1115::WriteRegister(uint8_t reg, uint16_t value) {
                                                    ((value & 0xFF00) >> 8));
   
   if (result < 0) {
-    std::cerr << "Error writing register 0x" << std::hex
-              << static_cast<int>(reg) << std::endl;
+    LOG_ERROR("Error writing register 0x%02X", static_cast<int>(reg));
     return false;
   }
   
@@ -81,7 +80,7 @@ float ADS1115::ConvertToVoltage(int16_t raw_value) {
 bool ADS1115::Init() {
 
   if (initialized_) {
-    std::cout << "ADS1115 already initialized!" << std::endl;
+    LOG_WARN("ADS1115 already initialized!");
     return true;
   }
 
@@ -91,31 +90,32 @@ bool ADS1115::Init() {
   }
 
   if (wiringPiSetup() < 0) {
-    std::cerr << "Error initializing WiringPi!" << std::endl;
+    LOG_ERROR("Error initializing WiringPi!");
     return false;
   }
   
   i2c_fd_ = wiringPiI2CSetup(i2c_address_);
   if (i2c_fd_ < 0) {
-    std::cerr << "Error initializing I2C with ADS1115!" << std::endl;
+    LOG_ERROR("Error initializing I2C with ADS1115!");
     return false;
   }
 
   uint8_t reg {static_cast<uint8_t>(ads1115_constants::Register::kConfig)};
   bool success = WriteRegister(reg, config_register_);
   if (!success) {
-    std::cerr << "Error configuring ADS1115!" << std::endl;
+    LOG_ERROR("Error configuring ADS1115!");
     return false;
   }
   
-  std::cout << "ADS1115 initialized successfully!" << std::endl;
+  LOG_INFO("ADS1115 initialized successfully!");
   initialized_ = true;
   return true;
 }
 
 int16_t ADS1115::ReadRawADC() {
+  // TODO (allan): usar exception?
   if (!initialized_) {
-    std::cerr << "ADS1115 not initialized! Call Init() first." << std::endl;
+    LOG_ERROR("ADS1115 not initialized! Call Init() first.");
     return INT16_MIN;
   }
 
@@ -135,14 +135,16 @@ float ADS1115::ReadVoltage() {
 }
 
 uint16_t ADS1115::ReadConfigRegisterFromHardware() {
+  // TODO (allan): usar exception?
   if (!initialized_) {
-    std::cerr << "ADS1115 not initialized! Call Init() first." << std::endl;
+    LOG_ERROR("ADS1115 not initialized! Call Init() first.");
     return 0xFFFF;
   }
   
   return ReadRegister(static_cast<uint8_t>(ads1115_constants::Register::kConfig));
 }
 
+// TODO (allan): manter essa função?
 bool ADS1115::VerifyConfigRegister() {
   uint16_t hardware_value {ReadConfigRegisterFromHardware()};
   

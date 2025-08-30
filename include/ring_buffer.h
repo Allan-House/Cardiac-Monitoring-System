@@ -1,3 +1,6 @@
+#ifndef RING_BUFFER_H_
+#define RING_BUFFER_H_
+
 #include <cstdlib>
 #include <mutex>
 #include <optional>
@@ -150,3 +153,5 @@ class RingBuffer {
     return size;
   }
 };
+
+#endif

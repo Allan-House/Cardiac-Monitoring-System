@@ -52,9 +52,11 @@ namespace cardiac_logger {
     char log_filename_[config::kMaxFilenameLength];
     std::atomic<bool> initialized_{false};
     std::atomic<bool> shutdown_{false};
+    std::atomic<bool> console_output_{true};  // Enable console output by default
       
     // Thread synchronization
     std::mutex file_mutex_;
+    std::mutex console_mutex_;  // Separate mutex for console output
     std::thread flush_thread_;
       
     Logger() {
@@ -67,17 +69,17 @@ namespace cardiac_logger {
       return std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
     }
       
-    void format_timestamp(uint64_t timestamp_us, char* buffer, size_t kBufferSize) {
+    void format_timestamp(uint64_t timestamp_us, char* buffer, size_t buffer_size) {
       time_t seconds = timestamp_us / 1000000;
       int microseconds = timestamp_us % 1000000;
           
-      struct tm* tm_kInfo = localtime(&seconds);
-      strftime(buffer, kBufferSize, "%Y-%m-%d %H:%M:%S", tm_kInfo);
+      struct tm* tm_info = localtime(&seconds);
+      strftime(buffer, buffer_size, "%Y-%m-%d %H:%M:%S", tm_info);
           
       // Add microseconds
       char temp[32];
       snprintf(temp, sizeof(temp), ".%06d", microseconds);
-      strncat(buffer, temp, kBufferSize - strlen(buffer) - 1);
+      strncat(buffer, temp, buffer_size - strlen(buffer) - 1);
     }
       
     const char* level_to_string(Level level) {
@@ -91,22 +93,40 @@ namespace cardiac_logger {
         default:               return "UNK ";
       }
     }
+
+    // Get ANSI color codes for console output
+    const char* level_to_color(Level level) {
+      switch (level) {
+        case Level::kCritical: return "\033[1;35m";  // Bright Magenta
+        case Level::kError:    return "\033[1;31m";  // Bright Red
+        case Level::kWarn:     return "\033[1;33m";  // Bright Yellow
+        case Level::kInfo:     return "\033[1;32m";  // Bright Green
+        case Level::kDebug:    return "\033[1;36m";  // Bright Cyan
+        case Level::kTrace:    return "\033[1;37m";  // Bright White
+        default:               return "\033[0m";     // Reset
+      }
+    }
       
     void flush_worker() {
       while (!shutdown_.load()) {
         flush_to_file();
         std::this_thread::sleep_for(std::chrono::milliseconds(config::kFlushIntervalMS));
       }
+      // Final flush when shutting down
       flush_to_file();
     }
       
     void flush_to_file() {
-      if (!initialized_.load()) {return;}
+      if (!initialized_.load()) {
+        return;
+      }
 
       std::lock_guard<std::mutex> lock(file_mutex_);
           
       FILE* file = fopen(log_filename_, "a");
-      if (!file) {return;}
+      if (!file) {
+        return;
+      }
 
       size_t current_read = read_index_.load();
       size_t current_write = write_index_.load();
@@ -118,32 +138,35 @@ namespace cardiac_logger {
         char timestamp_str[32];
         format_timestamp(entry.timestamp_us, timestamp_str, sizeof(timestamp_str));
               
-        // Writes formatted log entry
+        // Write formatted log entry to file only (console already handled)
         fprintf(file, "[%s] %s: %s\n",
                 timestamp_str, 
                 level_to_string(entry.level),
                 entry.message);
 
-        current_read++;
+        current_read = (current_read + 1) % buffer_.size();
       }
           
       read_index_.store(current_read);
+      fflush(file);  // Force flush to disk
       fclose(file);
     }
 
     public:
     // Singleton instance getter
     static Logger& instance() {
-          static Logger logger;
-          return logger;
-      }
+      static Logger logger;
+      return logger;
+    }
       
     // Delete construction and assignment operators (singleton pattern)
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
       
     bool init(const char* filename = nullptr, Level level = config::kDefaultLevel) {
-      if (initialized_.load()) {return true;}
+      if (initialized_.load()) {
+        return true;
+      }
 
       if (filename) {
         strncpy(log_filename_, filename, config::kMaxFilenameLength - 1);
@@ -153,11 +176,18 @@ namespace cardiac_logger {
       current_level_.store(level);
       shutdown_.store(false);
           
+      // Initialize the buffer indices
+      write_index_.store(0);
+      read_index_.store(0);
+      
       // Start the flushing thread
       try {
         flush_thread_ = std::thread(&Logger::flush_worker, this);
         initialized_.store(true);
             
+        // Add a small delay to ensure thread is ready
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        
         log_internal(Level::kInfo,
                       "Cardiac Logger initialized: file=%s, level=%d",
                       log_filename_,
@@ -170,9 +200,15 @@ namespace cardiac_logger {
     }
       
     void shutdown() {
-      if (!initialized_.load()) {return;}
+      if (!initialized_.load()) {
+        return;
+      }
 
       log_internal(Level::kInfo, "Cardiac Logger shutting down...");
+      
+      // Give some time for the last message to be written
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      
       shutdown_.store(true);
       
       if (flush_thread_.joinable()) {
@@ -182,22 +218,41 @@ namespace cardiac_logger {
       initialized_.store(false);
     }
       
-    ~Logger() {shutdown();}
+    ~Logger() {
+      shutdown();
+    }
       
-    void set_level(Level level) {current_level_.store(level);}
+    void set_level(Level level) {
+      current_level_.store(level);
+    }
       
-    Level get_level() const {return current_level_.load();}
+    Level get_level() const {
+      return current_level_.load();
+    }
       
     bool is_level_enabled(Level level) const {
       return static_cast<int>(level) <= static_cast<int>(current_level_.load());
     }
+
+    void enable_console_output(bool enable) {
+      console_output_.store(enable);
+    }
+
+    bool is_console_output_enabled() const {
+      return console_output_.load();
+    }
       
     void log_internal(Level level, const char* format, ...) {
-      if (!is_level_enabled(level)) {return;}
+      if (!is_level_enabled(level)) {
+        return;
+      }
 
-      size_t write_pos = write_index_.fetch_add(1) % buffer_.size();
-      LogEntry& entry = buffer_[write_pos];
-          
+      // Wait a bit if not initialized yet
+      if (!initialized_.load()) {
+        return;
+      }
+
+      LogEntry entry;
       entry.level = level;
       entry.timestamp_us = get_timestamp_us();
           
@@ -206,6 +261,29 @@ namespace cardiac_logger {
       vsnprintf(entry.message, config::kMaxLogLength - 1, format, args);
       va_end(args);
       entry.message[config::kMaxLogLength - 1] = '\0';
+
+      // Immediate console output for better responsiveness
+      if (console_output_.load()) {
+        char timestamp_str[32];
+        format_timestamp(entry.timestamp_us, timestamp_str, sizeof(timestamp_str));
+        
+        std::lock_guard<std::mutex> console_lock(console_mutex_);
+        printf("%s[%s] %s: %s\033[0m\n",
+               level_to_color(entry.level),
+               timestamp_str,
+               level_to_string(entry.level),
+               entry.message);
+        fflush(stdout);  // Immediate console output
+      }
+
+      // Add to buffer for file logging
+      size_t write_pos = write_index_.fetch_add(1) % buffer_.size();
+      buffer_[write_pos] = entry;
+    }
+
+    // Add a force flush method for testing
+    void force_flush() {
+      flush_to_file();
     }
   };
 
@@ -227,9 +305,23 @@ namespace cardiac_logger {
     return Logger::instance().get_level();
   }
 
+  inline void force_flush() {
+    Logger::instance().force_flush();
+  }
+
+  inline void enable_console_output(bool enable) {
+    Logger::instance().enable_console_output(enable);
+  }
+
+  inline bool is_console_output_enabled() {
+    return Logger::instance().is_console_output_enabled();
+  }
+
   // Main logging functions
   inline void log_kCritical(const char* format, ...) {
-    if (!Logger::instance().is_level_enabled(Level::kCritical)) {return;}
+    if (!Logger::instance().is_level_enabled(Level::kCritical)) {
+      return;
+    }
     va_list args;
     va_start(args, format);
     char buffer[config::kMaxLogLength];
@@ -239,7 +331,9 @@ namespace cardiac_logger {
   }
 
   inline void log_kError(const char* format, ...) {
-    if (!Logger::instance().is_level_enabled(Level::kError)) {return;}
+    if (!Logger::instance().is_level_enabled(Level::kError)) {
+      return;
+    }
     va_list args;
     va_start(args, format);
     char buffer[config::kMaxLogLength];
@@ -249,7 +343,9 @@ namespace cardiac_logger {
   }
 
   inline void log_kWarn(const char* format, ...) {
-    if (!Logger::instance().is_level_enabled(Level::kWarn)) {return;}
+    if (!Logger::instance().is_level_enabled(Level::kWarn)) {
+      return;
+    }
     va_list args;
     va_start(args, format);
     char buffer[config::kMaxLogLength];
@@ -259,7 +355,9 @@ namespace cardiac_logger {
   }
 
   inline void log_kInfo(const char* format, ...) {
-    if (!Logger::instance().is_level_enabled(Level::kInfo)) {return;}
+    if (!Logger::instance().is_level_enabled(Level::kInfo)) {
+      return;
+    }
     va_list args;
     va_start(args, format);
     char buffer[config::kMaxLogLength];
@@ -269,7 +367,9 @@ namespace cardiac_logger {
   }
 
   inline void log_kDebug(const char* format, ...) {
-    if (!Logger::instance().is_level_enabled(Level::kDebug)) {return;}
+    if (!Logger::instance().is_level_enabled(Level::kDebug)) {
+      return;
+    }
     va_list args;
     va_start(args, format);
     char buffer[config::kMaxLogLength];
@@ -279,7 +379,9 @@ namespace cardiac_logger {
   }
 
   inline void log_kTrace(const char* format, ...) {
-    if (!Logger::instance().is_level_enabled(Level::kTrace)) {return;}
+    if (!Logger::instance().is_level_enabled(Level::kTrace)) {
+      return;
+    }
     va_list args;
     va_start(args, format);
     char buffer[config::kMaxLogLength];

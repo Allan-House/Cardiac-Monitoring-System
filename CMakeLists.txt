@@ -10,13 +10,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   message(STATUS "Debug build: LOG_DEBUG and LOG_TRACE enabled")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
   message(STATUS "Release build: LOG_DEBUG and LOG_TRACE disabled")
-  target_compile_definitions(${PROJECT_NAME} PRIVATE NDEBUG)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(CMAKE_CROSSCOMPILING)
-    message(STATUS "Cross-compiling for Raspberry Pi 3")
+  message(STATUS "Cross-compiling for Raspberry Pi 3")
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -28,6 +27,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(SOURCES
   src/main.cpp
   src/ads1115.cpp
+  src/application.cpp
 )
 
 set(WIRINGPI_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/wiring-pi)
@@ -46,6 +46,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
+  $<$<CONFIG:Debug>:DEBUG>
   $<$<CONFIG:Release>:NDEBUG>
   $<$<CONFIG:MinSizeRel>:NDEBUG>
   $<$<CONFIG:RelWithDebInfo>:NDEBUG>

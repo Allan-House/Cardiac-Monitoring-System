@@ -1,5 +1,5 @@
-#ifndef ADS_1115_
-#define ADS_1115_
+#ifndef ADS_1115_H_
+#define ADS_1115_H_
 
 #include <cstdint>
 #include <iostream>
@@ -192,7 +192,7 @@ class ADS1115 {
   void set_gain(ads1115_constants::Gain gain);
   void set_mux(ads1115_constants::Mux mux);
 
-  uint16_t get_config_register() {return config_register_;}
+  uint16_t get_config_register() const {return config_register_;}
 };
 
 #endif

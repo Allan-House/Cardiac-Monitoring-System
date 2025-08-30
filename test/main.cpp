@@ -6,8 +6,8 @@
 
 /*
 size_t buffer_size {1280};
-  auto ring_buffer {std::make_unique<RingBuffer<float>>(buffer_size)};
-  auto ads1115 {std::make_unique<ADS1115>()};
+  auto ring_buffer {std::make_shared<RingBuffer<float>>(buffer_size)};
+  auto ads1115 {std::make_shared<ADS1115>()};
 
   if(!ads1115->Init()) {
     return 1;
