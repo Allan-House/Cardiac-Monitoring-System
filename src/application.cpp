@@ -55,7 +55,7 @@ void Application::Run() {
       file_manager_->WriterLoop(running_); 
   });
   
-  std::this_thread::sleep_for(std::chrono::seconds(5));
+  std::this_thread::sleep_for(std::chrono::seconds(10));
   Stop();
   /*
   if (acquisition_thread_.joinable()) {

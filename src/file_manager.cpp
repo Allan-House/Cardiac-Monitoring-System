@@ -3,10 +3,14 @@
 #include <filesystem>
 #include <iostream>
 
-FileManager::FileManager(std::shared_ptr<RingBuffer<Sample>> buffer, 
-                        const std::string& filename,
+FileManager::FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
+                        const std::string& bin_filename,
+                        const std::string& csv_filename,
                         std::chrono::milliseconds write_interval)
-  : buffer_(buffer), filename_(filename), write_interval_(write_interval)
+  : buffer_ {buffer},
+  bin_filename_ {bin_filename},
+  csv_filename_ {csv_filename},
+  write_interval_ {write_interval}
 {
   // Empty constructor
 }
@@ -16,18 +20,25 @@ FileManager::~FileManager() {
 }
 
 bool FileManager::Init() {
-  LOG_INFO("Initializing FileManager with file: %s", filename_.c_str());
+  LOG_INFO("Initializing FileManager with files: %s %s",
+            bin_filename_.c_str(), csv_filename_.c_str());
   
-  file_stream_ = std::make_unique<std::ofstream>(filename_, std::ios::out | std::ios::trunc);
+  bin_stream_ = std::make_unique<std::ofstream>(bin_filename_, std::ios::out | std::ios::binary | std::ios::trunc);
+  csv_stream_ = std::make_unique<std::ofstream>(csv_filename_, std::ios::out | std::ios::trunc);
+
   
-  if (!file_stream_->is_open()) {
-    LOG_ERROR("Failed to create/open file: %s", filename_.c_str());
-    LOG_ERROR("Current working directory: %s", std::filesystem::current_path().c_str());
+  if (!bin_stream_->is_open()) {
+    LOG_ERROR("Failed to open binary file: %s", bin_filename_.c_str());
+    return false;
+  }
+
+  if (!csv_stream_->is_open()) {
+    LOG_ERROR("Failed to open CSV file: %s", csv_filename_.c_str());
     return false;
   }
   
-  LOG_INFO("File opened successfully: %s", filename_.c_str());
-  WriteHeader();
+  LOG_INFO("Files opened successfully");
+  WriteCSVHeader();
   
   return true;
 }
@@ -47,18 +58,20 @@ void FileManager::WriterLoop(std::atomic<bool>& running) {
 }
 
 void FileManager::Close() {
-  if (file_stream_ && file_stream_->is_open()) {
+  if ((csv_stream_ && csv_stream_->is_open()) ||
+    (bin_stream_ && bin_stream_->is_open())) {
     FlushRemainingData();
-    file_stream_->close();
-    LOG_INFO("File closed. Total samples: %zu, Total bytes: %zu", 
-              samples_written_, total_bytes_written_);
   }
+  if (csv_stream_ && csv_stream_->is_open()) {csv_stream_->close();}
+  if (bin_stream_ && bin_stream_->is_open()) {bin_stream_->close();}
+  LOG_INFO("File closed. Total samples: %zu, Total bytes: %zu", 
+            samples_written_, total_bytes_written_);
 }
 
-void FileManager::WriteHeader() {
-  if (file_stream_ && file_stream_->is_open()) {
-    *file_stream_ << "timestamp_us,voltage\n";
-    file_stream_->flush();
+void FileManager::WriteCSVHeader() {
+  if (csv_stream_ && csv_stream_->is_open()) {
+    *csv_stream_ << "timestamp_us,voltage\n";
+    csv_stream_->flush();
     LOG_DEBUG("CSV header written");
   } else {
     LOG_ERROR("Cannot write header - file stream not open");
@@ -66,8 +79,9 @@ void FileManager::WriteHeader() {
 }
 
 void FileManager::WriteAvailableData() {
-  if (!file_stream_ || !file_stream_->is_open()) {
-    LOG_ERROR("WriteAvailableData: File stream not open");
+  if ((!csv_stream_ || !csv_stream_->is_open()) &&
+    (!bin_stream_ || !bin_stream_->is_open())) {
+    LOG_WARN("FlushRemainingData: Neither CSV nor binary streams are open");
     return;
   }
 
@@ -83,7 +97,8 @@ void FileManager::WriteAvailableData() {
   }
   
   if (batch_count > 0) {
-    file_stream_->flush();
+    if (csv_stream_ && csv_stream_->is_open()) csv_stream_->flush();
+    if (bin_stream_ && bin_stream_->is_open()) bin_stream_->flush();
   }
 }
 
@@ -98,22 +113,42 @@ void FileManager::WriteSample(const Sample& sample) {
   
   uint64_t normalized_timestamp = microseconds - first_timestamp_.value();
   
-  std::string line {std::to_string(normalized_timestamp) + "," + 
-                    std::to_string(sample.voltage) + "\n"};
-  
-  *file_stream_ << line;
-  total_bytes_written_ += line.length();
+  // Binary
+  if (bin_stream_ && bin_stream_->is_open()) {
+    // Converts voltage to int16_t
+    float scaled {sample.voltage * 32768.0f / 4.096f};
+    if (scaled > 32767) {scaled = 32767;}
+    if (scaled < -32768) {scaled = -32768;}
+    int16_t raw_data = static_cast<int16_t>(scaled);
+
+    //
+    int64_t timestamp_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                           sample.timestamp.time_since_epoch()).count();
+
+    bin_stream_->write(reinterpret_cast<char*>(&raw_data), sizeof(raw_data));
+    bin_stream_->write(reinterpret_cast<char*>(&timestamp_us), sizeof(timestamp_us));
+    total_bytes_written_ += sizeof(raw_data) + sizeof(timestamp_us);
+  }
+
+  // CSV
+  if (csv_stream_ && csv_stream_->is_open()) {
+    std::string line {std::to_string(normalized_timestamp) + "," + 
+                      std::to_string(sample.voltage) + "\n"};
+    *csv_stream_ << line;
+    total_bytes_written_ += line.length();
+  }
 }
 
 void FileManager::FlushRemainingData() {
-  if (!file_stream_ || !file_stream_->is_open()) {
-  LOG_WARN("FlushRemainingData: File stream not open");
-  return;
-  }
-
   Sample sample;
   size_t final_count {0};
-  
+
+  if ((!csv_stream_ || !csv_stream_->is_open()) &&
+    (!bin_stream_ || !bin_stream_->is_open())) {
+    LOG_WARN("FlushRemainingData: Neither CSV nor binary streams are open");
+    return;
+  }
+
   while (!buffer_->Empty()) {
     sample = buffer_->Consume();
     WriteSample(sample);
@@ -122,7 +157,8 @@ void FileManager::FlushRemainingData() {
   }
 
   if (final_count > 0) {
-    file_stream_->flush();
+    if (csv_stream_ && csv_stream_->is_open()) csv_stream_->flush();
+    if (bin_stream_ && bin_stream_->is_open()) bin_stream_->flush();
     LOG_INFO("Flushed %zu remaining samples", final_count);
   }
 }

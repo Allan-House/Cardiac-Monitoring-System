@@ -27,9 +27,10 @@ int main(int argc, char** argv) {
   auto ads1115 {std::make_shared<ADS1115>()};
   auto buffer {std::make_shared<RingBuffer<Sample>>(75000)};
   auto file_manager = std::make_unique<FileManager>(
-    buffer, 
+    buffer,
+    "cardiac_data.bin",
     "cardiac_data.csv",
-    std::chrono::milliseconds(100)
+    std::chrono::milliseconds(200) // 50 samples per write
   );
 
 

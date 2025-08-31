@@ -11,10 +11,12 @@ class FileManager {
   private:
   // External dependencies
   std::shared_ptr<RingBuffer<Sample>> buffer_;
-  std::unique_ptr<std::ofstream> file_stream_;
+  std::unique_ptr<std::ofstream> bin_stream_;
+  std::unique_ptr<std::ofstream> csv_stream_;
 
   // Configuration
-  std::string filename_;
+  std::string bin_filename_;
+  std::string csv_filename_;
   std::chrono::milliseconds write_interval_;
 
   // Runtime state
@@ -23,8 +25,9 @@ class FileManager {
   size_t total_bytes_written_{0};
 
   public:
-  FileManager(std::shared_ptr<RingBuffer<Sample>> buffer, 
-              const std::string& filename,
+  FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
+              const std::string& bin_filename,
+              const std::string& csv_filename,
               std::chrono::milliseconds write_interval = std::chrono::milliseconds(100));
   
   ~FileManager();
@@ -38,7 +41,7 @@ class FileManager {
   size_t get_bytes_written() const { return total_bytes_written_; }
 
   private:
-  void WriteHeader();
+  void WriteCSVHeader();
   void WriteAvailableData();
   void WriteSample(const Sample& sample);
   void FlushRemainingData();
