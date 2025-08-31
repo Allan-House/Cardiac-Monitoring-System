@@ -88,6 +88,9 @@ void Application::Stop() {
 void Application::AcquisitionLoop() {
   auto start_time = std::chrono::steady_clock::now();
   uint32_t expected_sample {0};
+  #ifdef DEBUG
+    uint32_t sample_count{0};
+  #endif
   
   while (running_) {
     expected_sample++;
@@ -98,6 +101,16 @@ void Application::AcquisitionLoop() {
     
     Sample sample{ads1115_->ReadVoltage(), std::chrono::steady_clock::now()};
     buffer_->AddData(sample);
+
+    #ifdef DEBUG
+      sample_count++;
+        
+      if (sample_count % 250 == 0) {
+        std::cout << "Samples collected: " << sample_count 
+                  << " | Buffer size: " << buffer_->Size()
+                  << " | Last voltage: " << sample.voltage << "V" << std::endl;
+      }
+    #endif
     
     // Auto-correction: if too late, skip a sample
     auto now = std::chrono::steady_clock::now();
