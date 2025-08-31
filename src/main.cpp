@@ -1,6 +1,7 @@
 #include "ads1115.h"
 #include "application.h"
 #include "ecg_analyzer.h"
+#include "file_manager.h"
 #include "logger.h"
 #include "ring_buffer.h"
 #include <chrono>
@@ -9,7 +10,7 @@
 
 /**
  * 250 SPS x 300s -> 75000 samples
-  * 475 SPS x 300s -> 142500 samples
+ * 475 SPS x 300s -> 142500 samples
 */
 
 /* TODO (allan): Escolhas a serem feitas:
@@ -25,14 +26,19 @@ int main(int argc, char** argv) {
 
   auto ads1115 {std::make_shared<ADS1115>()};
   auto buffer {std::make_shared<RingBuffer<Sample>>(75000)};
+  auto file_manager = std::make_unique<FileManager>(
+    buffer, 
+    "cardiac_data.csv",
+    std::chrono::milliseconds(100)
+  );
 
-  Application application{ads1115, buffer};
+
+  Application application{ads1115, buffer, std::move(file_manager)};
 
   // TODO (allan): verificação de erro de Application::Start();
   if (application.Start()) {
     application.Run();
   }
-
-  std::cout << "Goodbye!!" << std::endl;
+  
   return 0;
 }

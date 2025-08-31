@@ -1,6 +1,7 @@
 #ifndef RING_BUFFER_H_
 #define RING_BUFFER_H_
 
+#include <condition_variable>
 #include <cstdlib>
 #include <mutex>
 #include <optional>
@@ -20,6 +21,7 @@ class RingBuffer {
   private:
   std::vector<T> buffer_; // TODO (allan): array?  
   std::mutex mutex_;
+  std::condition_variable data_added_;
 
   size_t head_ {0};
   size_t tail_ {0};
@@ -49,18 +51,20 @@ class RingBuffer {
    * 
    * @param data The element to add to the buffer
    */
-  void add_data(T data) {
-    std::lock_guard<std::mutex> lock(mutex_);
+  void AddData(T data) {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
 
-    buffer_.at(head_) = data;
+      buffer_.at(head_) = data;
 
-    if (full_) {
-      tail_ = (tail_ + 1) % max_size_;
+      if (full_) {
+        tail_ = (tail_ + 1) % max_size_;
+      }
+
+      head_ = (head_ + 1)  % max_size_;
+      full_ = head_ == tail_;
     }
-
-    head_ = (head_ + 1)  % max_size_;
-
-    full_ = head_ == tail_;
+    data_added_.notify_one();
   }
 
   /**
@@ -69,13 +73,9 @@ class RingBuffer {
    * @return std::optional<T> The oldest element if buffer is not empty, 
    *         std::nullopt otherwise
    */
-  std::optional<T> front() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    if (empty()) {
-      return std::nullopt;
-    }
-    
+  T Front() const {
+    std::unique_lock<std::mutex> lock(mutex_);
+    data_added_.wait(lock, [this]{return !Empty();});   
     return buffer_.at(tail_);
   }
 
@@ -85,12 +85,9 @@ class RingBuffer {
    * @return std::optional<T> The oldest element if buffer is not empty,
    *         std::nullopt otherwise
    */
-  std::optional<T> consume() {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    if (empty()) {
-      return std::nullopt;
-    }
+  T Consume() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    data_added_.wait(lock, [this]{return !Empty();});
 
     auto value = buffer_.at(tail_);
     full_ = false;
@@ -104,7 +101,7 @@ class RingBuffer {
    * 
    * Resets the buffer to an empty state by setting head equal to tail.
    */
-  void reset() {
+  void Reset() {
     std::lock_guard<std::mutex> lock(mutex_);
     head_ = tail_;
     full_ = false;
@@ -115,21 +112,21 @@ class RingBuffer {
    * 
    * @return true if the buffer contains no elements, false otherwise
    */
-  bool empty() const {return !full_ && (head_ == tail_);} 
+  bool Empty() const {return !full_ && (head_ == tail_);} 
   
   /**
    * @brief Checks if the buffer is full.
    * 
    * @return true if the buffer has reached its maximum capacity, false otherwise
    */
-  bool full() const {return full_;}
+  bool Full() const {return full_;}
 
   /**
    * @brief Returns the maximum capacity of the buffer.
    * 
    * @return The maximum number of elements the buffer can hold
    */
-  size_t capacity() const {return max_size_;}
+  size_t Capacity() const {return max_size_;}
 
   /**
    * @brief Returns the current number of elements in the buffer.
@@ -138,7 +135,7 @@ class RingBuffer {
    * 
    * @return The number of elements currently stored in the buffer
    */
-  size_t size() const {
+  size_t Size() const {
     size_t size = max_size_;
 
     if (!full_) {

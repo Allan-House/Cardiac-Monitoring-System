@@ -28,6 +28,7 @@ set(SOURCES
   src/main.cpp
   src/ads1115.cpp
   src/application.cpp
+  src/file_manager.cpp
 )
 
 set(WIRINGPI_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/wiring-pi)

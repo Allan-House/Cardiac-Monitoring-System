@@ -23,6 +23,7 @@ ADS1115::~ADS1115() {
   }
 }
 
+// TODO (allan): usar exception?
 uint16_t ADS1115::ReadRegister(uint8_t reg) {
   if (i2c_fd_ < 0) {
     LOG_ERROR("I2C not initialized!");
@@ -112,6 +113,7 @@ bool ADS1115::Init() {
   return true;
 }
 
+// TODO (allan): usar exception?
 int16_t ADS1115::ReadRawADC() {
   // TODO (allan): usar exception?
   if (!initialized_) {
@@ -124,6 +126,7 @@ int16_t ADS1115::ReadRawADC() {
   return static_cast<int16_t>(raw_data);
 }
 
+// TODO (allan): usar exception?
 float ADS1115::ReadVoltage() {
   int16_t raw_value {ReadRawADC()};
 
@@ -134,8 +137,8 @@ float ADS1115::ReadVoltage() {
   return ConvertToVoltage(raw_value);
 }
 
+// TODO (allan): usar exception?
 uint16_t ADS1115::ReadConfigRegisterFromHardware() {
-  // TODO (allan): usar exception?
   if (!initialized_) {
     LOG_ERROR("ADS1115 not initialized! Call Init() first.");
     return 0xFFFF;

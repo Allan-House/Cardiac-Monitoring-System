@@ -26,12 +26,12 @@ size_t buffer_size {1280};
   
   size_t samples_collected = 0;
   
-  while (!ring_buffer->full()) {
+  while (!ring_buffer->Full()) {
     // Espera até o próximo momento de amostragem
     std::this_thread::sleep_until(next_sample_time);
     
     // Lê o sample
-    ring_buffer->add_data(ads1115->ReadVoltage());
+    ring_buffer->AddData(ads1115->ReadVoltage());
     samples_collected++;
     
     // Agenda próxima amostragem
@@ -70,7 +70,7 @@ size_t buffer_size {1280};
     
     // Consome 128 samples (1 segundo), mas mostra apenas alguns
     for (size_t sample = 0; sample < 128; sample++) {
-      auto data = ring_buffer->consume();
+      auto data = ring_buffer->Consume();
       if (sample < 10 && data.has_value()) {
         std::cout << std::fixed << std::setprecision(3) << data.value() << " ";
       }
