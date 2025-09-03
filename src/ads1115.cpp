@@ -71,7 +71,7 @@ void ADS1115::CalculateVoltageRange() {
     case ads1115_constants::Gain::kFSR_0_256V_B: voltage_range_ = 0.256f; break;
     case ads1115_constants::Gain::kFSR_0_256V_C: voltage_range_ = 0.256f; break;
     default: voltage_range_ = 2.048f; break;
-    }
+  }
 }
 
 float ADS1115::ConvertToVoltage(int16_t raw_value) {
@@ -79,7 +79,6 @@ float ADS1115::ConvertToVoltage(int16_t raw_value) {
 }
 
 bool ADS1115::Init() {
-
   if (initialized_) {
     LOG_WARN("ADS1115 already initialized!");
     return true;
@@ -104,11 +103,11 @@ bool ADS1115::Init() {
   uint8_t reg {static_cast<uint8_t>(ads1115_constants::Register::kConfig)};
   bool success = WriteRegister(reg, config_register_);
   if (!success) {
-    LOG_ERROR("Error configuring ADS1115!");
+    LOG_ERROR("Error configuring ADS1115 register!");
     return false;
   }
   
-  LOG_INFO("ADS1115 initialized successfully!");
+  LOG_SUCCESS("ADS1115 initialized successfully!");
   initialized_ = true;
   return true;
 }
@@ -131,6 +130,7 @@ float ADS1115::ReadVoltage() {
   int16_t raw_value {ReadRawADC()};
 
   if (raw_value == INT16_MIN) {
+    LOG_ERROR("Error reading register ADS1115");
     return kErrorVoltage;
   }
 

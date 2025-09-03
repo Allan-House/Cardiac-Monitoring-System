@@ -18,7 +18,7 @@
 - Argumentos possíveis.
 */
 int main(int argc, char** argv) {
-  cardiac_logger::init("cardiac_system.log", cardiac_logger::Level::kTrace);
+  cardiac_logger::init("cardiac_system.log", cardiac_logger::Level::kDebug);
 
   std::cout << "==================================" << std::endl;
   std::cout << "Cardiac Monitoring System Starting" << std::endl;

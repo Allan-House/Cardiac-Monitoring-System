@@ -13,12 +13,12 @@
 
 namespace cardiac_logger {
   enum class Level : int {
-    kCritical = 0,  // System failures, hardware errors, fatal
-    kError    = 1,  // I2C failures, ADC errors, initialization failures
-    kWarn     = 2,  // Configuration issues, data quality issues
-    kInfo     = 3,  // System state change, successful initializations
-    kDebug    = 4,  // Detailed I2C transactions, raw ADC values
-    kTrace    = 5   // Function entry or exit, register operations
+    kCritical = 0,
+    kError    = 1,
+    kWarn     = 2,
+    kSuccess  = 3,
+    kInfo     = 4,
+    kDebug    = 5
   };
 
   namespace config {
@@ -87,9 +87,9 @@ namespace cardiac_logger {
         case Level::kCritical: return "CRIT";
         case Level::kError:    return "ERR";
         case Level::kWarn:     return "WARN";
+        case Level::kSuccess:  return "SCSS";
         case Level::kInfo:     return "INFO";
         case Level::kDebug:    return "DBG ";
-        case Level::kTrace:    return "TRC ";
         default:               return "UNK ";
       }
     }
@@ -100,9 +100,9 @@ namespace cardiac_logger {
         case Level::kCritical: return "\033[1;35m";  // Bright Magenta
         case Level::kError:    return "\033[1;31m";  // Bright Red
         case Level::kWarn:     return "\033[1;33m";  // Bright Yellow
-        case Level::kInfo:     return "\033[1;32m";  // Bright Green
+        case Level::kSuccess:  return "\033[1;32m";  // Bright Green
+        case Level::kInfo:     return "\033[1;37m";  // Bright White
         case Level::kDebug:    return "\033[1;36m";  // Bright Cyan
-        case Level::kTrace:    return "\033[1;37m";  // Bright White
         default:               return "\033[0m";     // Reset
       }
     }
@@ -353,6 +353,18 @@ namespace cardiac_logger {
     va_end(args);
     Logger::instance().log_internal(Level::kWarn, "%s", buffer);
   }
+  
+  inline void log_kSuccess(const char* format, ...) {
+    if (!Logger::instance().is_level_enabled(Level::kSuccess)) {
+      return;
+    }
+    va_list args;
+    va_start(args, format);
+    char buffer[config::kMaxLogLength];
+    vsnprintf(buffer, sizeof(buffer) - 1, format, args);
+    va_end(args);
+    Logger::instance().log_internal(Level::kSuccess, "%s", buffer);
+  }
 
   inline void log_kInfo(const char* format, ...) {
     if (!Logger::instance().is_level_enabled(Level::kInfo)) {
@@ -378,35 +390,22 @@ namespace cardiac_logger {
     Logger::instance().log_internal(Level::kDebug, "%s", buffer);
   }
 
-  inline void log_kTrace(const char* format, ...) {
-    if (!Logger::instance().is_level_enabled(Level::kTrace)) {
-      return;
-    }
-    va_list args;
-    va_start(args, format);
-    char buffer[config::kMaxLogLength];
-    vsnprintf(buffer, sizeof(buffer) - 1, format, args);
-    va_end(args);
-    Logger::instance().log_internal(Level::kTrace, "%s", buffer);
-  }
-
 } // namespace cardiac_logger
 
 // Convenience macros
 #define LOG_CRITICAL(...) cardiac_logger::log_kCritical(__VA_ARGS__)
 #define LOG_ERROR(...)    cardiac_logger::log_kError(__VA_ARGS__)
 #define LOG_WARN(...)     cardiac_logger::log_kWarn(__VA_ARGS__)
+#define LOG_SUCCESS(...)  cardiac_logger::log_kSuccess(__VA_ARGS__)
 #define LOG_INFO(...)     cardiac_logger::log_kInfo(__VA_ARGS__)
 
 // Conditional macros for different builds
 #if defined(NDEBUG) || defined(CARDIAC_RELEASE)
-  // PRODUCTION BUILD: Removes debug/trace logs completely
+  // PRODUCTION BUILD: Removes debug logs completely
   #define LOG_DEBUG(...) ((void)0)
-  #define LOG_TRACE(...) ((void)0)
 #else
   // DEVELOPMENT BUILD: All logs active
   #define LOG_DEBUG(...) cardiac_logger::log_kDebug(__VA_ARGS__)
-  #define LOG_TRACE(...) cardiac_logger::log_kTrace(__VA_ARGS__)
 #endif
 
 #endif

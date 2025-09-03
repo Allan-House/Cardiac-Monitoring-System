@@ -7,9 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  message(STATUS "Debug build: LOG_DEBUG and LOG_TRACE enabled")
+  message(STATUS "Debug build: LOG_DEBUG enabled")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-  message(STATUS "Release build: LOG_DEBUG and LOG_TRACE disabled")
+  message(STATUS "Release build: LOG_DEBUG disabled")
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

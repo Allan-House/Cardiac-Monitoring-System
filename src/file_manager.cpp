@@ -8,9 +8,9 @@ FileManager::FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
                         const std::string& csv_filename,
                         std::chrono::milliseconds write_interval)
   : buffer_ {buffer},
-  bin_filename_ {bin_filename},
-  csv_filename_ {csv_filename},
-  write_interval_ {write_interval}
+    bin_filename_ {bin_filename},
+    csv_filename_ {csv_filename},
+    write_interval_ {write_interval}
 {
   // Empty constructor
 }
@@ -23,10 +23,15 @@ bool FileManager::Init() {
   LOG_INFO("Initializing FileManager with files: %s %s",
             bin_filename_.c_str(), csv_filename_.c_str());
   
-  bin_stream_ = std::make_unique<std::ofstream>(bin_filename_, std::ios::out | std::ios::binary | std::ios::trunc);
-  csv_stream_ = std::make_unique<std::ofstream>(csv_filename_, std::ios::out | std::ios::trunc);
+  bin_stream_ = std::make_unique<std::ofstream>(bin_filename_,
+                                                std::ios::out | 
+                                                std::ios::binary |
+                                                std::ios::trunc);
 
-  
+  csv_stream_ = std::make_unique<std::ofstream>(csv_filename_,
+                                                std::ios::out |
+                                                std::ios::trunc);
+
   if (!bin_stream_->is_open()) {
     LOG_ERROR("Failed to open binary file: %s", bin_filename_.c_str());
     return false;
@@ -37,7 +42,7 @@ bool FileManager::Init() {
     return false;
   }
   
-  LOG_INFO("Files opened successfully");
+  LOG_SUCCESS("Files opened successfully");
   WriteCSVHeader();
   
   return true;
@@ -46,15 +51,15 @@ bool FileManager::Init() {
 void FileManager::WriterLoop(std::atomic<bool>& running) {
   auto next_write_time {std::chrono::steady_clock::now()};
   
-  LOG_TRACE("FileManager writer loop started");
+  LOG_INFO("Starting files writing thread...");
   
   while (running) {
     std::this_thread::sleep_until(next_write_time);
     WriteAvailableData();
     next_write_time += write_interval_;
   }
-  
-  LOG_TRACE("FileManager writer loop finished");
+
+  LOG_INFO("Stopping files writing thread...");
 }
 
 void FileManager::Close() {
@@ -72,16 +77,15 @@ void FileManager::WriteCSVHeader() {
   if (csv_stream_ && csv_stream_->is_open()) {
     *csv_stream_ << "timestamp_us,voltage\n";
     csv_stream_->flush();
-    LOG_DEBUG("CSV header written");
   } else {
-    LOG_ERROR("Cannot write header - file stream not open");
+    LOG_ERROR("Cannot write CSV header - file stream not open");
   }
 }
 
 void FileManager::WriteAvailableData() {
   if ((!csv_stream_ || !csv_stream_->is_open()) &&
     (!bin_stream_ || !bin_stream_->is_open())) {
-    LOG_WARN("FlushRemainingData: Neither CSV nor binary streams are open");
+    LOG_WARN("Neither CSV nor binary streams are open");
     return;
   }
 
@@ -145,7 +149,7 @@ void FileManager::FlushRemainingData() {
 
   if ((!csv_stream_ || !csv_stream_->is_open()) &&
     (!bin_stream_ || !bin_stream_->is_open())) {
-    LOG_WARN("FlushRemainingData: Neither CSV nor binary streams are open");
+    LOG_WARN("Neither CSV nor binary streams are open");
     return;
   }
 

@@ -22,11 +22,9 @@ Application::~Application() {
 }
 
 bool Application::Start() {
+  LOG_INFO("Starting application...");
   LOG_INFO("Sample rate: %d SPS", static_cast<int>(kSampleRate));
   LOG_INFO("Sample period: %d μs", kPeriodUs);
-  LOG_INFO("Buffer capacity: %zu samples", buffer_->Capacity());
-  LOG_INFO("Expected buffer duration: %.1f seconds", 
-            static_cast<float>(buffer_->Capacity()) / kSampleRate);
   
   if(!ads1115_->Init()) {
     return false;
@@ -37,7 +35,7 @@ bool Application::Start() {
     return false;
   }
 
-  LOG_INFO("All components initialized successfully");
+  LOG_SUCCESS("All components initialized successfully");
   return true;
 }
 
@@ -46,10 +44,9 @@ bool Application::Start() {
 //               - Condições de parada específicas
 //               - Monitoramento de sistema
 void Application::Run() {
-  LOG_INFO("Starting all threads...");
   running_ = true;
   
-  // CONTROLE CENTRALIZADO DAS DUAS THREADS
+  // TODO (allan): refatorar (provavelmente)
   acquisition_thread_ = std::thread(&Application::AcquisitionLoop, this);
   writing_thread_ = std::thread([this]() { 
       file_manager_->WriterLoop(running_); 
@@ -67,7 +64,6 @@ void Application::Run() {
 
 void Application::Stop() {
   if (running_) {
-    LOG_INFO("Stopping all threads...");
     running_ = false;
 
     if (acquisition_thread_.joinable()) {
@@ -80,12 +76,14 @@ void Application::Stop() {
 
     file_manager_->Close();
 
-    LOG_INFO("All threads stopped");
   }
+
+  LOG_SUCCESS("Application stopped");
 }
 
 // TODO (allan): adicionar tratamento de exceção?
 void Application::AcquisitionLoop() {
+  LOG_INFO("Starting acquisition thread...");
   auto start_time = std::chrono::steady_clock::now();
   uint32_t expected_sample {0};
   #ifdef DEBUG
@@ -104,7 +102,8 @@ void Application::AcquisitionLoop() {
 
     #ifdef DEBUG
       sample_count++;
-        
+      
+      // TODO (allan): tentar usar constante em vez de número mágico.
       if (sample_count % 250 == 0) {
         std::cout << "Samples collected: " << sample_count 
                   << " | Buffer size: " << buffer_->Size()
@@ -121,6 +120,8 @@ void Application::AcquisitionLoop() {
       expected_sample = std::chrono::duration_cast<std::chrono::microseconds>(now - start_time).count() / 4000;
     }
   }
+
+  LOG_INFO("Stopping acquisition thread...");
 }
 
 void Application::WritingLoop() {
