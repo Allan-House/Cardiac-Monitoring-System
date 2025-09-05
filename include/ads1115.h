@@ -88,6 +88,7 @@ namespace ads1115_constants {
  * @note Requires wiringPi library for I2C communication.
  */
 class ADS1115 {
+  // TODO (allan): Pensar melhor em como lidar com erros de leitura.
   static constexpr float kErrorVoltage = -999.0f;
 
   private:

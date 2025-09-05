@@ -23,13 +23,11 @@ bool FileManager::Init() {
   LOG_INFO("Initializing FileManager with files: %s %s",
             bin_filename_.c_str(), csv_filename_.c_str());
   
-  bin_stream_ = std::make_unique<std::ofstream>(bin_filename_,
-                                                std::ios::out | 
+  bin_stream_ = std::make_unique<std::ofstream>(bin_filename_, 
                                                 std::ios::binary |
                                                 std::ios::trunc);
 
   csv_stream_ = std::make_unique<std::ofstream>(csv_filename_,
-                                                std::ios::out |
                                                 std::ios::trunc);
 
   if (!bin_stream_->is_open()) {
@@ -48,12 +46,16 @@ bool FileManager::Init() {
   return true;
 }
 
-void FileManager::WriterLoop(std::atomic<bool>& running) {
+void FileManager::Run() {
+  writing_thread_ = std::thread(&FileManager::WritingLoop, this);
+}
+
+void FileManager::WritingLoop() {
   auto next_write_time {std::chrono::steady_clock::now()};
   
   LOG_INFO("Starting files writing thread...");
   
-  while (running) {
+  while (!buffer_->Empty()) {
     std::this_thread::sleep_until(next_write_time);
     WriteAvailableData();
     next_write_time += write_interval_;

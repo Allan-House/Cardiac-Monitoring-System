@@ -4,6 +4,7 @@
 #include <fstream>
 #include <chrono>
 #include <atomic>
+#include <thread>
 #include "ring_buffer.h"
 #include "ecg_analyzer.h"
 
@@ -24,21 +25,24 @@ class FileManager {
   size_t samples_written_{0};
   size_t total_bytes_written_{0};
 
+  std::thread writing_thread_;
+
   public:
   FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
               const std::string& bin_filename,
               const std::string& csv_filename,
-              std::chrono::milliseconds write_interval = std::chrono::milliseconds(100));
+              std::chrono::milliseconds write_intervalo);
   
   ~FileManager();
   
   bool Init();
-  void WriterLoop(std::atomic<bool>& running);
+  void Run();
+  void WritingLoop();
   void Close();
   
   // Stats
-  size_t get_samples_written() const { return samples_written_; }
-  size_t get_bytes_written() const { return total_bytes_written_; }
+  size_t get_samples_written() const {return samples_written_;}
+  size_t get_bytes_written() const {return total_bytes_written_;}
 
   private:
   void WriteCSVHeader();

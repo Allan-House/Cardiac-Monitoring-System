@@ -10,9 +10,17 @@
 #include <thread>
 
 Application::Application(std::shared_ptr<ADS1115> ads1115, 
-                         std::shared_ptr<RingBuffer<Sample>> buffer,
-                         std::shared_ptr<FileManager> file_manager)
-  : ads1115_ {ads1115}, buffer_ {buffer}, file_manager_ {file_manager}
+                         std::shared_ptr<RingBuffer<Sample>> buffer_raw,
+                         std::shared_ptr<RingBuffer<ProcessedSample>> buffer_processed,
+                         std::shared_ptr<ECGAnalyzer> ecg_analyzer,
+                         std::shared_ptr<FileManager> file_manager,
+                         std::shared_ptr<SystemMonitor> system_monitor)
+  : ads1115_ {ads1115},
+    buffer_raw_ {buffer_raw},
+    buffer_processed_ {buffer_processed},
+    ecg_analyzer_ {ecg_analyzer},
+    file_manager_ {file_manager},
+    system_monitor_ {system_monitor}
 {
   // Empty constructor
 }
@@ -44,38 +52,27 @@ bool Application::Start() {
 //               - Condições de parada específicas
 //               - Monitoramento de sistema
 void Application::Run() {
-  running_ = true;
-  
-  // TODO (allan): refatorar (provavelmente)
-  acquisition_thread_ = std::thread(&Application::AcquisitionLoop, this);
-  writing_thread_ = std::thread([this]() { 
-      file_manager_->WriterLoop(running_); 
-  });
-  
-  std::this_thread::sleep_for(std::chrono::seconds(10));
-  Stop();
-  /*
-  if (acquisition_thread_.joinable()) {
-    acquisition_thread_.join();
+  if (!running_.load()) {
+    LOG_ERROR("Application not started. Call Start() first.");
+    return;
   }
-  */
+
+  LOG_INFO("Starting acquisition for %ld seconds.", acquisition_duration_.count());
+  
+  auto start_time {std::chrono::steady_clock::now()};
+
+  acquisition_thread_ = std::thread(&Application::AcquisitionLoop, this);
+  ecg_analyzer_->Run();
+  file_manager_->Run();
+  // system_monitor_->Run();
+  
+  std::this_thread::sleep_for(acquisition_duration_);
+  Stop();
 }
   
-
 void Application::Stop() {
   if (running_) {
     running_ = false;
-
-    if (acquisition_thread_.joinable()) {
-      acquisition_thread_.join();
-    }
-        
-    if (writing_thread_.joinable()) {
-      writing_thread_.join();
-    }
-
-    file_manager_->Close();
-
   }
 
   LOG_SUCCESS("Application stopped");
@@ -90,6 +87,7 @@ void Application::AcquisitionLoop() {
     uint32_t sample_count{0};
   #endif
   
+  // TODO (allan): tempo definido
   while (running_) {
     expected_sample++;
     
@@ -98,7 +96,7 @@ void Application::AcquisitionLoop() {
     std::this_thread::sleep_until(target_time);
     
     Sample sample{ads1115_->ReadVoltage(), std::chrono::steady_clock::now()};
-    buffer_->AddData(sample);
+    buffer_raw_->AddData(sample);
 
     #ifdef DEBUG
       sample_count++;
@@ -106,7 +104,7 @@ void Application::AcquisitionLoop() {
       // TODO (allan): tentar usar constante em vez de número mágico.
       if (sample_count % 250 == 0) {
         std::cout << "Samples collected: " << sample_count 
-                  << " | Buffer size: " << buffer_->Size()
+                  << " | Buffer size: " << buffer_raw_->Size()
                   << " | Last voltage: " << sample.voltage << "V" << std::endl;
       }
     #endif
@@ -122,8 +120,4 @@ void Application::AcquisitionLoop() {
   }
 
   LOG_INFO("Stopping acquisition thread...");
-}
-
-void Application::WritingLoop() {
-  file_manager_->WriterLoop(running_);
 }

@@ -7,6 +7,8 @@
 #include <optional>
 #include <vector>
 
+// TODO (allan): atualizar documentação.
+
 /**
  * @brief Thread-safe circular buffer implementation using a ring buffer data structure.
  * 

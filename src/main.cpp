@@ -4,6 +4,7 @@
 #include "file_manager.h"
 #include "logger.h"
 #include "ring_buffer.h"
+#include "system_monitor.h"
 #include <chrono>
 #include <iostream>
 #include <memory>
@@ -25,21 +26,28 @@ int main(int argc, char** argv) {
   std::cout << "==================================" << std::endl;
 
   auto ads1115 {std::make_shared<ADS1115>()};
-  auto buffer {std::make_shared<RingBuffer<Sample>>(75000)};
-  auto file_manager = std::make_unique<FileManager>(
-    buffer,
+  auto buffer_raw {std::make_shared<RingBuffer<Sample>>(75000)};
+  auto buffer_processed {std::make_shared<RingBuffer<ProcessedSample>>(75000)};
+  auto ecg_analyzer {std::make_shared<ECGAnalyzer>()};
+  auto file_manager = std::make_shared<FileManager>(
+    buffer_processed,
     "cardiac_data.bin",
     "cardiac_data.csv",
     std::chrono::milliseconds(200) // 50 samples per write
   );
-
-
-  Application application{ads1115, buffer, std::move(file_manager)};
+  auto system_monitor {std::make_shared<SystemMonitor>()};
+  
+  Application application{ads1115, 
+                          buffer_raw,
+                          buffer_processed,   
+                          ecg_analyzer,
+                          file_manager,
+                          system_monitor};
 
   // TODO (allan): verificação de erro de Application::Start();
   if (application.Start()) {
     application.Run();
   }
-  
+
   return 0;
 }
