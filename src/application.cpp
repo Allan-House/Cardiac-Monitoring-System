@@ -43,6 +43,9 @@ bool Application::Start() {
   }
 
   LOG_SUCCESS("All components initialized successfully");
+
+  // TODO (allan): definir running_ aqui?
+  running_ = true;
   return true;
 }
 

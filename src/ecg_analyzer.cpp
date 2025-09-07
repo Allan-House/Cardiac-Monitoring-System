@@ -42,13 +42,6 @@ void ECGAnalyzer::ProcessingLoop() {
     Sample raw;
     raw = buffer_raw_->Consume();
     
-    #ifdef DEBUG
-    sample_count++;
-    if (sample_count % 250 == 0) {
-      std::cout << "Samples processed: " << static_cast<int>(sample_count) << std::endl;
-    }
-    #endif
-    
     Sample processed;
     processed = raw;
     buffer_processed_->AddData(processed);
@@ -56,10 +49,12 @@ void ECGAnalyzer::ProcessingLoop() {
 
   LOG_INFO("Processing remaining samples in buffer...");
   while (!buffer_raw_->Empty()) {
-    Sample sample;
-    sample = buffer_raw_->Consume();
-    // processa a sample
-    // adiciona ao buffer de dados processados
+    Sample raw;
+    raw = buffer_raw_->Consume();
+    
+    Sample processed;
+    processed = raw;
+    buffer_processed_->AddData(processed);
   }
 
   LOG_INFO("Processing thread finished.");
