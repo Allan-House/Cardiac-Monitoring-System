@@ -15,10 +15,6 @@ FileManager::FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
   // Empty constructor
 }
 
-FileManager::~FileManager() {
-  Close();
-}
-
 bool FileManager::Init() {
   LOG_INFO("Initializing FileManager with files: %s %s",
             bin_filename_.c_str(), csv_filename_.c_str());
@@ -47,6 +43,7 @@ bool FileManager::Init() {
 }
 
 void FileManager::Run() {
+  writing_ = true;
   writing_thread_ = std::thread(&FileManager::WritingLoop, this);
 }
 
@@ -55,20 +52,34 @@ void FileManager::WritingLoop() {
   
   LOG_INFO("Starting files writing thread...");
   
+  while (writing_) {
+    std::this_thread::sleep_until(next_write_time);
+    WriteAvailableData();
+    next_write_time += write_interval_;
+  }
+
   while (!buffer_->Empty()) {
     std::this_thread::sleep_until(next_write_time);
     WriteAvailableData();
     next_write_time += write_interval_;
   }
 
-  LOG_INFO("Stopping files writing thread...");
+  FlushRemainingData();
+  LOG_INFO("File writing thread finished.");
+}
+
+void FileManager::Stop() {
+  LOG_INFO("Stopping file writing...");
+  writing_ = false;
+
+  if (writing_thread_.joinable()) {
+    writing_thread_.join();
+  }
+
+  Close();
 }
 
 void FileManager::Close() {
-  if ((csv_stream_ && csv_stream_->is_open()) ||
-    (bin_stream_ && bin_stream_->is_open())) {
-    FlushRemainingData();
-  }
   if (csv_stream_ && csv_stream_->is_open()) {csv_stream_->close();}
   if (bin_stream_ && bin_stream_->is_open()) {bin_stream_->close();}
   LOG_INFO("File closed. Total samples: %zu, Total bytes: %zu", 
@@ -155,6 +166,7 @@ void FileManager::FlushRemainingData() {
     return;
   }
 
+  LOG_INFO("Writing remaining data...");
   while (!buffer_->Empty()) {
     sample = buffer_->Consume();
     WriteSample(sample);

@@ -27,14 +27,14 @@ int main(int argc, char** argv) {
 
   auto ads1115 {std::make_shared<ADS1115>()};
   auto buffer_raw {std::make_shared<RingBuffer<Sample>>(75000)};
-  auto buffer_processed {std::make_shared<RingBuffer<ProcessedSample>>(75000)};
-  auto ecg_analyzer {std::make_shared<ECGAnalyzer>()};
-  auto file_manager = std::make_shared<FileManager>(
+  auto buffer_processed {std::make_shared<RingBuffer<Sample>>(75000)};
+  auto ecg_analyzer {std::make_shared<ECGAnalyzer>(buffer_raw, buffer_processed)};
+  auto file_manager {std::make_shared<FileManager>(
     buffer_processed,
     "cardiac_data.bin",
     "cardiac_data.csv",
     std::chrono::milliseconds(200) // 50 samples per write
-  );
+  )};
   auto system_monitor {std::make_shared<SystemMonitor>()};
   
   Application application{ads1115, 

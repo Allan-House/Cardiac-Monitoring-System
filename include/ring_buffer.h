@@ -114,7 +114,7 @@ class RingBuffer {
    * 
    * @return true if the buffer contains no elements, false otherwise
    */
-  bool Empty() const {return !full_ && (head_ == tail_);} 
+  bool Empty() const {return !full_ && (head_ == tail_);}
   
   /**
    * @brief Checks if the buffer is full.

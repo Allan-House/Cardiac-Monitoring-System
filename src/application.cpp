@@ -11,7 +11,7 @@
 
 Application::Application(std::shared_ptr<ADS1115> ads1115, 
                          std::shared_ptr<RingBuffer<Sample>> buffer_raw,
-                         std::shared_ptr<RingBuffer<ProcessedSample>> buffer_processed,
+                         std::shared_ptr<RingBuffer<Sample>> buffer_processed,
                          std::shared_ptr<ECGAnalyzer> ecg_analyzer,
                          std::shared_ptr<FileManager> file_manager,
                          std::shared_ptr<SystemMonitor> system_monitor)
@@ -39,7 +39,6 @@ bool Application::Start() {
   }
 
   if (!file_manager_->Init()) {
-    LOG_ERROR("Failed to initialize FileManager");
     return false;
   }
 
@@ -57,17 +56,19 @@ void Application::Run() {
     return;
   }
 
-  LOG_INFO("Starting acquisition for %ld seconds.", acquisition_duration_.count());
-  
-  auto start_time {std::chrono::steady_clock::now()};
-
   acquisition_thread_ = std::thread(&Application::AcquisitionLoop, this);
   ecg_analyzer_->Run();
   file_manager_->Run();
   // system_monitor_->Run();
-  
-  std::this_thread::sleep_for(acquisition_duration_);
-  Stop();
+
+  LOG_INFO("Waiting for acquisition to complete...");
+  if (acquisition_thread_.joinable()) {
+    acquisition_thread_.join();
+  }
+
+  ecg_analyzer_->Stop();
+  file_manager_->Stop();
+  // system_monitor_->Run();
 }
   
 void Application::Stop() {
@@ -80,15 +81,17 @@ void Application::Stop() {
 
 // TODO (allan): adicionar tratamento de exceção?
 void Application::AcquisitionLoop() {
-  LOG_INFO("Starting acquisition thread...");
+  LOG_INFO("Starting acquisition for %ld seconds.", acquisition_duration_.count());
+
   auto start_time = std::chrono::steady_clock::now();
-  uint32_t expected_sample {0};
+  auto end_time = start_time + acquisition_duration_;
+  
   #ifdef DEBUG
-    uint32_t sample_count{0};
+  uint32_t sample_count{0};
   #endif
   
-  // TODO (allan): tempo definido
-  while (running_) {
+  uint32_t expected_sample {0};
+  while (std::chrono::steady_clock::now() < end_time) {
     expected_sample++;
     
     auto target_time = start_time + (expected_sample * kSamplePeriod);
@@ -100,8 +103,6 @@ void Application::AcquisitionLoop() {
 
     #ifdef DEBUG
       sample_count++;
-      
-      // TODO (allan): tentar usar constante em vez de número mágico.
       if (sample_count % 250 == 0) {
         std::cout << "Samples collected: " << sample_count 
                   << " | Buffer size: " << buffer_raw_->Size()
@@ -119,5 +120,5 @@ void Application::AcquisitionLoop() {
     }
   }
 
-  LOG_INFO("Stopping acquisition thread...");
+  LOG_INFO("Acquisition duration completed.");
 }

@@ -24,7 +24,7 @@ class Application {
   // External dependencies
   std::shared_ptr<ADS1115> ads1115_;
   std::shared_ptr<RingBuffer<Sample>> buffer_raw_;
-  std::shared_ptr<RingBuffer<ProcessedSample>> buffer_processed_;
+  std::shared_ptr<RingBuffer<Sample>> buffer_processed_;
   std::shared_ptr<ECGAnalyzer> ecg_analyzer_;
   std::shared_ptr<FileManager> file_manager_;
   std::shared_ptr<SystemMonitor> system_monitor_;
@@ -34,8 +34,6 @@ class Application {
 
   // Synchronization
   std::atomic<bool> running_ {false};
-  std::condition_variable data_available_;
-  std::mutex data_mutex_;
 
   // Runtime configuration
   std::chrono::seconds acquisition_duration_ {300};
@@ -43,7 +41,7 @@ class Application {
   public:
   Application(std::shared_ptr<ADS1115> ads1115,
               std::shared_ptr<RingBuffer<Sample>> buffer_raw,
-              std::shared_ptr<RingBuffer<ProcessedSample>> buffer_processed,
+              std::shared_ptr<RingBuffer<Sample>> buffer_processed,
               std::shared_ptr<ECGAnalyzer> ecg_analyzer,
               std::shared_ptr<FileManager> file_manager,
               std::shared_ptr<SystemMonitor> system_monitor);

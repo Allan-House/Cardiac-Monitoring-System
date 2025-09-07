@@ -28,6 +28,7 @@ set(SOURCES
   src/main.cpp
   src/ads1115.cpp
   src/application.cpp
+  src/ecg_analyzer.cpp
   src/file_manager.cpp
 )
 

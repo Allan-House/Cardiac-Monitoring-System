@@ -22,9 +22,9 @@ class FileManager {
 
   // Runtime state
   std::optional<uint64_t> first_timestamp_;
-  size_t samples_written_{0};
-  size_t total_bytes_written_{0};
-
+  size_t samples_written_ {0};
+  size_t total_bytes_written_ {0};
+  std::atomic<bool> writing_ {false};
   std::thread writing_thread_;
 
   public:
@@ -33,10 +33,9 @@ class FileManager {
               const std::string& csv_filename,
               std::chrono::milliseconds write_intervalo);
   
-  ~FileManager();
-  
   bool Init();
   void Run();
+  void Stop();
   void WritingLoop();
   void Close();
   
