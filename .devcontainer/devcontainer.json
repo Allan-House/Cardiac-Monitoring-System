@@ -4,7 +4,11 @@
         "dockerfile": "Dockerfile",
         "context": ".."
     },
-    "runArgs": ["--hostname=rpi3-dev"],
+    "runArgs": [
+        "--hostname=rpi3-dev",
+        "-e", "DISPLAY=${localEnv:DISPLAY}",
+        "-v", "/tmp/.X11-unix:/tmp/.X11-unix"
+    ],
     "customizations": {
         "vscode": {
             "extensions": [

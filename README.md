@@ -8,6 +8,10 @@ sudo i2cdetect -y 1
 
 ### Docker
 
+```
+xhost +local:docker
+```
+
 ### How to Compile
 
 ```
