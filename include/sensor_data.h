@@ -7,10 +7,10 @@
 
 class SensorData : public DataSource {
   private:
-  std::unique_ptr<ADS1115> ads1115_;
+  std::shared_ptr<ADS1115> ads1115_;
 
   public:
-  SensorData(std::unique_ptr<ADS1115> ads1115);
+  SensorData(std::shared_ptr<ADS1115> ads1115);
   
   float ReadVoltage() override;
   bool Available() const override;

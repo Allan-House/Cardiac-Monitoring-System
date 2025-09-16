@@ -31,7 +31,9 @@ set(SOURCES
   src/ads1115.cpp
   src/application.cpp
   src/ecg_analyzer.cpp
+  src/file_data.cpp
   src/file_manager.cpp
+  src/sensor_data.cpp
 )
 
 set(WIRINGPI_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/wiring-pi)

@@ -3,8 +3,8 @@
 #include <memory>
 #include <utility>
 
-SensorData::SensorData(std::unique_ptr<ADS1115> ads1115)
-  : ads1115_ {std::move(ads1115)}
+SensorData::SensorData(std::shared_ptr<ADS1115> ads1115)
+  : ads1115_ {ads1115}
 {
   // Empty constructor.
 }

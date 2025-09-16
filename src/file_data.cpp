@@ -20,7 +20,6 @@ FileData::FileData(const std::string& filename, float voltage_range, bool loop)
     return;
   }
 
-  first_timestamp_us_ = samples_.at(0).timestamp_us;
   initialized_ = true;
   LOG_SUCCESS("Loaded %zu samples from %s", samples_.size(), filename);
 }
@@ -35,7 +34,7 @@ bool FileData::LoadSamples(const std::string& filename) {
   file_stream_.open(filename, std::ios::binary);
 
   if (!file_stream_.is_open()) {
-    LOG_ERROR("Failed to oepn file: %s", filename);
+    LOG_ERROR("Failed to open file: %s", filename);
     return false;
   }
 
@@ -62,4 +61,48 @@ bool FileData::LoadSamples(const std::string& filename) {
 
 float FileData::ConvertToVoltage(int16_t raw_value) const {
   return (raw_value * voltage_range_) / 32768.0f;
+}
+
+bool FileData::Initialized() const {
+  return initialized_;
+}
+
+float FileData::ReadVoltage() {
+  // TODO (allan): padronizar erro de leitura.
+  if (!initialized_ || !Available()) {
+    return 0.0f;
+  }
+
+  float voltage {samples_.at(current_index_).voltage};
+  current_index_++;
+
+  if (current_index_ >= samples_.size()) {
+    if (loop_playback_) {
+      Reset();
+    } else {
+      current_index_ = samples_.size(); // Stay at end;
+    }
+  }
+
+  return voltage;
+}
+
+bool FileData::Available() const {
+  if (!initialized_) {
+    return false;
+  }
+
+  if (loop_playback_) {
+    return !samples_.empty();
+  }
+
+  return current_index_ < samples_.size();
+}
+
+void FileData::Reset() {
+  current_index_ = 0;
+}
+
+bool FileData::End() const {
+  return current_index_ >= samples_.size();
 }

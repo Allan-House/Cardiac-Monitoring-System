@@ -9,13 +9,15 @@
 #include <memory>
 #include <thread>
 
-Application::Application(std::shared_ptr<ADS1115> ads1115, 
+Application::Application(std::shared_ptr<ADS1115> ads1115,
+                         std::shared_ptr<DataSource> data_source,
                          std::shared_ptr<RingBuffer<Sample>> buffer_raw,
                          std::shared_ptr<RingBuffer<Sample>> buffer_processed,
                          std::shared_ptr<ECGAnalyzer> ecg_analyzer,
                          std::shared_ptr<FileManager> file_manager,
                          std::shared_ptr<SystemMonitor> system_monitor)
   : ads1115_ {ads1115},
+    data_source_ {data_source},
     buffer_raw_ {buffer_raw},
     buffer_processed_ {buffer_processed},
     ecg_analyzer_ {ecg_analyzer},
@@ -37,6 +39,8 @@ bool Application::Start() {
   if(!ads1115_->Init()) {
     return false;
   }
+
+  // TODO (allan): Adicionar verificação de data source.
 
   if (!file_manager_->Init()) {
     return false;
@@ -101,7 +105,7 @@ void Application::AcquisitionLoop() {
     
     std::this_thread::sleep_until(target_time);
     
-    Sample sample{ads1115_->ReadVoltage(), std::chrono::steady_clock::now()};
+    Sample sample{data_source_->ReadVoltage(), std::chrono::steady_clock::now()};
     buffer_raw_->AddData(sample);
 
     #ifdef DEBUG

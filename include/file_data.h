@@ -24,18 +24,13 @@ class FileData : public DataSource {
   float voltage_range_ {4.096f};
   bool initialized_ {false};
   
-  // Timing control
-  std::chrono::steady_clock::time_point start_time_;
-  int64_t first_timestamp_us_ {0};
-  bool timing_initialized_ {false};
-
   public:
   explicit FileData(const std::string& filename, 
                    float voltage_range = 4.096f, 
                    bool loop = true);
   ~FileData();
   
-  bool IsInitialized() const;
+  bool Initialized() const;
   
   float ReadVoltage() override;
   bool Available() const override;
@@ -43,14 +38,13 @@ class FileData : public DataSource {
   // File data management
   void Reset();
   bool End() const;
-  size_t get_total_samples() const;
-  size_t get_current_index() const;
-  void set_loop_playback(bool loop);
+  size_t get_total_samples() const {return samples_.size();}
+  size_t get_current_index() const {return current_index_;}
+  void set_loop_playback(bool loop) {loop_playback_ = loop;}
 
   private:
   bool LoadSamples(const std::string& filename);
   float ConvertToVoltage(int16_t raw_value) const;
-  bool TimeToReadNextSample() const;
 };
 
 #endif
