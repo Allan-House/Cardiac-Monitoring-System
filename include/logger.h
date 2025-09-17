@@ -89,8 +89,8 @@ namespace cardiac_logger {
         case Level::kWarn:     return "WARN";
         case Level::kSuccess:  return "SCSS";
         case Level::kInfo:     return "INFO";
-        case Level::kDebug:    return "DBG ";
-        default:               return "UNK ";
+        case Level::kDebug:    return "DBG";
+        default:               return "UNK";
       }
     }
 

@@ -31,31 +31,48 @@ void ECGAnalyzer::Stop() {
 }
 
 void ECGAnalyzer::ProcessingLoop() {
-  LOG_INFO("Starting processing thread...");
-
+  LOG_INFO("Starting ECG processing with filtering enabled");
+  
   #ifdef DEBUG
   uint32_t sample_count {0};
   #endif
 
   // Real-time processing
   while (processing_) {
-    Sample raw;
-    raw = buffer_raw_->Consume();
+    Sample raw = buffer_raw_->Consume();
     
+    // Apply filtering
     Sample processed;
-    processed = raw;
+    processed.voltage = filter_.Process(raw.voltage);
+    processed.timestamp = raw.timestamp;
+    
     buffer_processed_->AddData(processed);
+    
+    #ifdef DEBUG
+    sample_count++;
+    if (sample_count % 1000 == 0) {
+      LOG_DEBUG("Processed %u samples | Raw: %.4fV | Filtered: %.4fV",
+                sample_count, raw.voltage, processed.voltage);
+    }
+    #endif
   }
 
   LOG_INFO("Processing remaining samples in buffer...");
   while (!buffer_raw_->Empty()) {
-    Sample raw;
-    raw = buffer_raw_->Consume();
+    Sample raw = buffer_raw_->Consume();
     
     Sample processed;
-    processed = raw;
+    processed.voltage = filter_.Process(raw.voltage);
+    processed.timestamp = raw.timestamp;
     buffer_processed_->AddData(processed);
+    
+    #ifdef DEBUG
+    sample_count++;
+    #endif
   }
 
+  #ifdef DEBUG
+  LOG_INFO("ECG filtering completed for %u samples", sample_count);
+  #endif
   LOG_INFO("Processing thread finished.");
 }

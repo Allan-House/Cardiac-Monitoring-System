@@ -2,6 +2,7 @@
 #define ECG_ANALYZER_H_
 
 #include "ring_buffer.h"
+#include "ecg_filter.h"
 #include <atomic>
 #include <chrono>
 #include <memory>
@@ -22,6 +23,7 @@ class ECGAnalyzer {
   private:
   std::shared_ptr<RingBuffer<Sample>> buffer_raw_;
   std::shared_ptr<RingBuffer<Sample>> buffer_processed_;
+  ECGFilter filter_;
   std::atomic<bool> processing_ {false};
   std::thread processing_thread_;
 
