@@ -20,8 +20,8 @@ class FileData : public DataSource {
   std::ifstream file_stream_;
   std::vector<FileDataSample> samples_;
   size_t current_index_ {0};
-  bool loop_playback_ {true};
   float voltage_range_ {4.096f};
+  bool loop_playback_ {true};
   bool initialized_ {false};
   
   public:

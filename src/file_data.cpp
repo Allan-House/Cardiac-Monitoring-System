@@ -11,17 +11,17 @@ FileData::FileData(const std::string& filename, float voltage_range, bool loop)
   loop_playback_ {loop}
 {
   if (!LoadSamples(filename)) {
-    LOG_ERROR("Failed to load samples from file: %s", filename);
+    LOG_ERROR("Failed to load samples from file: %s", filename.c_str());
     return;
   }
 
   if (samples_.empty()) {
-    LOG_ERROR("No samples found in file: %s", filename);
+    LOG_ERROR("No samples found in file: %s", filename.c_str());
     return;
   }
 
   initialized_ = true;
-  LOG_SUCCESS("Loaded %zu samples from %s", samples_.size(), filename);
+  LOG_SUCCESS("Loaded %zu samples from %s", samples_.size(), filename.c_str());
 }
 
 FileData::~FileData() {

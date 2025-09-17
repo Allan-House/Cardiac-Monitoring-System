@@ -7,6 +7,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Set compilers based on cross-compilation
+if(NOT CMAKE_CROSSCOMPILING)
+  set(CMAKE_C_COMPILER gcc)
+  set(CMAKE_CXX_COMPILER g++)
+endif()
+
 # Build type
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   message(STATUS "Debug build: LOG_DEBUG enabled")
@@ -26,15 +32,25 @@ endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+# Base sources
 set(SOURCES
   src/main.cpp
-  src/ads1115.cpp
   src/application.cpp
   src/ecg_analyzer.cpp
-  src/file_data.cpp
   src/file_manager.cpp
-  src/sensor_data.cpp
 )
+
+# Add platform-specific sources
+if(CMAKE_CROSSCOMPILING)
+  list(APPEND SOURCES
+    src/ads1115.cpp
+    src/sensor_data.cpp
+  )
+else()
+  list(APPEND SOURCES
+    src/file_data.cpp
+  )
+endif()
 
 set(WIRINGPI_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/wiring-pi)
 
@@ -45,11 +61,19 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   ${WIRINGPI_LIB_DIR}/include
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE 
-  ${WIRINGPI_LIB_DIR}/wiringpi.a
-  m
-  pthread
-)
+# Link libraries based on cross-compilation
+if(CMAKE_CROSSCOMPILING)
+  target_link_libraries(${PROJECT_NAME} PRIVATE 
+    ${WIRINGPI_LIB_DIR}/wiringpi.a
+    m
+    pthread
+  )
+else()
+  target_link_libraries(${PROJECT_NAME} PRIVATE 
+    m
+    pthread
+  )
+endif()
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
   $<$<CONFIG:Debug>:DEBUG>
@@ -57,6 +81,13 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
   $<$<CONFIG:MinSizeRel>:NDEBUG>
   $<$<CONFIG:RelWithDebInfo>:NDEBUG>
 )
+
+# Define compile-time macros for data source detection
+if(CMAKE_CROSSCOMPILING)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE USE_HARDWARE_SOURCE)
+else()
+  target_compile_definitions(${PROJECT_NAME} PRIVATE USE_FILE_SOURCE)
+endif()
 
 target_compile_options(${PROJECT_NAME} PRIVATE
   -Wall

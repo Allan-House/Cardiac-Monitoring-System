@@ -1,7 +1,6 @@
 #ifndef APPLICATION_H_
 #define APPLICATION_H_
 
-#include "ads1115.h"
 #include "data_source.h"
 #include "ecg_analyzer.h"
 #include "file_manager.h"
@@ -23,7 +22,6 @@ class Application {
   static constexpr auto kSamplePeriod{std::chrono::microseconds(kPeriodUs)};
   
   // External dependencies
-  std::shared_ptr<ADS1115> ads1115_;
   std::shared_ptr<DataSource> data_source_;
   std::shared_ptr<RingBuffer<Sample>> buffer_raw_;
   std::shared_ptr<RingBuffer<Sample>> buffer_processed_;
@@ -41,8 +39,7 @@ class Application {
   std::chrono::seconds acquisition_duration_ {300};
 
   public:
-  Application(std::shared_ptr<ADS1115> ads1115,
-              std::shared_ptr<DataSource> data_source,
+  Application(std::shared_ptr<DataSource> data_source,
               std::shared_ptr<RingBuffer<Sample>> buffer_raw,
               std::shared_ptr<RingBuffer<Sample>> buffer_processed,
               std::shared_ptr<ECGAnalyzer> ecg_analyzer,

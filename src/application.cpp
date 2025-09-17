@@ -9,15 +9,13 @@
 #include <memory>
 #include <thread>
 
-Application::Application(std::shared_ptr<ADS1115> ads1115,
-                         std::shared_ptr<DataSource> data_source,
+Application::Application(std::shared_ptr<DataSource> data_source,
                          std::shared_ptr<RingBuffer<Sample>> buffer_raw,
                          std::shared_ptr<RingBuffer<Sample>> buffer_processed,
                          std::shared_ptr<ECGAnalyzer> ecg_analyzer,
                          std::shared_ptr<FileManager> file_manager,
                          std::shared_ptr<SystemMonitor> system_monitor)
-  : ads1115_ {ads1115},
-    data_source_ {data_source},
+  : data_source_ {data_source},
     buffer_raw_ {buffer_raw},
     buffer_processed_ {buffer_processed},
     ecg_analyzer_ {ecg_analyzer},
@@ -36,7 +34,8 @@ bool Application::Start() {
   LOG_INFO("Sample rate: %d SPS", static_cast<int>(kSampleRate));
   LOG_INFO("Sample period: %d μs", kPeriodUs);
   
-  if(!ads1115_->Init()) {
+  if (!data_source_->Available()) {
+    LOG_ERROR("Data source not available");
     return false;
   }
 
