@@ -2,17 +2,34 @@
 #include "logger.h"
 #include <filesystem>
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 
 FileManager::FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
-                        const std::string& bin_filename,
-                        const std::string& csv_filename,
+                        const std::string& base_filename,
                         std::chrono::milliseconds write_interval)
   : buffer_ {buffer},
-    bin_filename_ {bin_filename},
-    csv_filename_ {csv_filename},
     write_interval_ {write_interval}
 {
-  // Empty constructor
+  CreateDirectories();
+  std::string timestamp = GenerateTimestamp();
+  
+  bin_filename_ = "data/processed/" + base_filename + "_" + timestamp + ".bin";
+  csv_filename_ = "data/processed/" + base_filename + "_" + timestamp + ".csv";
+}
+
+void FileManager::CreateDirectories() {
+  std::filesystem::create_directories("data/processed");
+  std::filesystem::create_directories("data/raw");
+}
+
+std::string FileManager::GenerateTimestamp() {
+  auto now = std::chrono::system_clock::now();
+  auto time_t = std::chrono::system_clock::to_time_t(now);
+  
+  std::stringstream ss;
+  ss << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S");
+  return ss.str();
 }
 
 bool FileManager::Init() {

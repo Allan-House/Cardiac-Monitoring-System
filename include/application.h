@@ -36,7 +36,7 @@ class Application {
   std::atomic<bool> running_ {false};
 
   // Runtime configuration
-  std::chrono::seconds acquisition_duration_ {300};
+  std::chrono::seconds acquisition_duration_ {70};
 
   public:
   Application(std::shared_ptr<DataSource> data_source,

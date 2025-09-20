@@ -51,8 +51,7 @@ int main(int argc, char** argv) {
   auto ecg_analyzer = std::make_shared<ECGAnalyzer>(buffer_raw, buffer_processed);
   auto file_manager = std::make_shared<FileManager>(
     buffer_processed,
-    "cardiac_data.bin",
-    "cardiac_data.csv",
+    "cardiac_data",  // base filename, timestamp will be added
     std::chrono::milliseconds(200) // 50 samples per write
   );
   auto system_monitor = std::make_shared<SystemMonitor>();
@@ -79,7 +78,7 @@ std::shared_ptr<DataSource> createDataSource(int argc, char** argv) {
   return std::make_shared<SensorData>(ads1115);
   
 #elif defined(USE_FILE_SOURCE)
-  std::string filename = "/workspaces/Cardiac-Monitoring-System/data/ecg_samples.bin"; // Default file
+  std::string filename = "data/raw/ecg_samples.bin"; // Default file in data/ folder
   
   if (argc > 1) {
     filename = argv[1];

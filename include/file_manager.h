@@ -5,6 +5,7 @@
 #include <chrono>
 #include <atomic>
 #include <thread>
+#include <filesystem>
 #include "ring_buffer.h"
 #include "ecg_analyzer.h"
 
@@ -29,8 +30,7 @@ class FileManager {
 
   public:
   FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
-              const std::string& bin_filename,
-              const std::string& csv_filename,
+              const std::string& base_filename,
               std::chrono::milliseconds write_intervalo);
   
   bool Init();
@@ -48,6 +48,8 @@ class FileManager {
   void WriteAvailableData();
   void WriteSample(const Sample& sample);
   void FlushRemainingData();
+  void CreateDirectories();
+  std::string GenerateTimestamp();
 };
 
 #endif
