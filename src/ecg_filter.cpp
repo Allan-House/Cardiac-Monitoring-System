@@ -1,52 +1,32 @@
 #include "ecg_filter.h"
 
-ECGFilter::ECGFilter() {
-  // Initialize buffers with zeros
-  baseline_buffer_.resize(kBaselineTaps, 0.0f);
-  smooth_buffer_.resize(kSmoothTaps, 0.0f);
+void ECGFilter::Initialize(double x0) {
+  for (size_t sec = 0; sec < kSections.size(); ++sec) {
+    state_[sec][0] = kZi[sec][0] * x0;
+    state_[sec][1] = kZi[sec][1] * x0;
+  }
 }
 
 float ECGFilter::Process(float input) {
-  // Stage 1: Baseline removal (subtract moving average for high-pass effect)
-  baseline_buffer_.push_front(input);
-  if (baseline_buffer_.size() > kBaselineTaps) {
-    baseline_buffer_.pop_back();
+  double y = static_cast<double>(input);
+  
+  for (size_t sec = 0; sec < kSections.size(); ++sec) {
+    const auto& s = kSections[sec];
+    double& z1 = state_[sec][0];
+    double& z2 = state_[sec][1];
+
+    // Direct Form II Transposed
+    double out = s.b0 * y + z1;
+    z1 = s.b1 * y - s.a1 * out + z2;
+    z2 = s.b2 * y - s.a2 * out;
+    y = out;
   }
   
-  float baseline_avg = 0.0f;
-  for (float val : baseline_buffer_) {
-    baseline_avg += val;
-  }
-  baseline_avg /= baseline_buffer_.size();
-  
-  float baseline_removed = input - baseline_avg;
-  
-  // Stage 2: Simple smoothing (moving average for noise reduction)
-  smooth_buffer_.push_front(baseline_removed);
-  if (smooth_buffer_.size() > kSmoothTaps) {
-    smooth_buffer_.pop_back();
-  }
-  
-  float smoothed = 0.0f;
-  for (float val : smooth_buffer_) {
-    smoothed += val;
-  }
-  smoothed /= smooth_buffer_.size();
-  
-  return smoothed;
+  return static_cast<float>(y);
 }
 
 void ECGFilter::Reset() {
-  std::fill(baseline_buffer_.begin(), baseline_buffer_.end(), 0.0f);
-  std::fill(smooth_buffer_.begin(), smooth_buffer_.end(), 0.0f);
-}
-
-float ECGFilter::CalculateAverage(const std::deque<float>& buffer) {
-  if (buffer.empty()) return 0.0f;
-  
-  float sum = 0.0f;
-  for (float val : buffer) {
-    sum += val;
+  for (auto& st : state_) {
+    st[0] = st[1] = 0.0;
   }
-  return sum / buffer.size();
 }

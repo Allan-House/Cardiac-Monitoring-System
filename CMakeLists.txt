@@ -37,7 +37,7 @@ set(SOURCES
   src/main.cpp
   src/application.cpp
   src/ecg_analyzer.cpp
-  src/ecg_filter.cpp 
+  src/ecg_filter.cpp
   src/file_manager.cpp
 )
 

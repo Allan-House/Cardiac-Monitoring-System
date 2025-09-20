@@ -37,6 +37,21 @@ void ECGAnalyzer::ProcessingLoop() {
   uint32_t sample_count {0};
   #endif
 
+  // Prime the filter with the first sample
+  if (!buffer_raw_->Empty()) {
+    Sample first = buffer_raw_->Consume();
+    filter_.Initialize(first.voltage);
+
+    Sample processed;
+    processed.voltage = filter_.Process(first.voltage);
+    processed.timestamp = first.timestamp;
+    buffer_processed_->AddData(processed);
+
+    #ifdef DEBUG
+    sample_count++;
+    #endif
+  }
+
   // Real-time processing
   while (processing_) {
     Sample raw = buffer_raw_->Consume();
