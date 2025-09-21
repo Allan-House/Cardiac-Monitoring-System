@@ -3,6 +3,18 @@
 #include <filesystem>
 #include <iostream>
 
+std::string WaveTypeToString(WaveType type) {
+  switch (type) {
+    case WaveType::kNormal: return "N";
+    case WaveType::kP:      return "P";
+    case WaveType::kQ:      return "Q";
+    case WaveType::kR:      return "R";
+    case WaveType::kS:      return "S";
+    case WaveType::kT:      return "T";
+    default:                return "-";
+  }
+}
+
 FileManager::FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
                         const std::string& bin_filename,
                         const std::string& csv_filename,
@@ -88,7 +100,7 @@ void FileManager::Close() {
 
 void FileManager::WriteCSVHeader() {
   if (csv_stream_ && csv_stream_->is_open()) {
-    *csv_stream_ << "timestamp_us,voltage\n";
+    *csv_stream_ << "timestamp_us,voltage,classification\n";
     csv_stream_->flush();
   } else {
     LOG_ERROR("Cannot write CSV header - file stream not open");
@@ -149,8 +161,10 @@ void FileManager::WriteSample(const Sample& sample) {
 
   // CSV
   if (csv_stream_ && csv_stream_->is_open()) {
-    std::string line {std::to_string(normalized_timestamp) + "," + 
-                      std::to_string(sample.voltage) + "\n"};
+  std::string classification_str = WaveTypeToString(sample.classification);
+  std::string line {std::to_string(normalized_timestamp) + "," + 
+                    std::to_string(sample.voltage) + "," +
+                    classification_str + "\n"};
     *csv_stream_ << line;
     total_bytes_written_ += line.length();
   }

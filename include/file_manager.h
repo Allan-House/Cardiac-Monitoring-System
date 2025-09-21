@@ -31,7 +31,7 @@ class FileManager {
   FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
               const std::string& bin_filename,
               const std::string& csv_filename,
-              std::chrono::milliseconds write_intervalo);
+              std::chrono::milliseconds write_interval);
   
   bool Init();
   void Run();

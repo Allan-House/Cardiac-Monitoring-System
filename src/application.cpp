@@ -11,13 +11,13 @@
 
 Application::Application(std::shared_ptr<DataSource> data_source,
                          std::shared_ptr<RingBuffer<Sample>> buffer_raw,
-                         std::shared_ptr<RingBuffer<Sample>> buffer_processed,
+                         std::shared_ptr<RingBuffer<Sample>> buffer_classified,
                          std::shared_ptr<ECGAnalyzer> ecg_analyzer,
                          std::shared_ptr<FileManager> file_manager,
                          std::shared_ptr<SystemMonitor> system_monitor)
   : data_source_ {data_source},
     buffer_raw_ {buffer_raw},
-    buffer_processed_ {buffer_processed},
+    buffer_classified_ {buffer_classified},
     ecg_analyzer_ {ecg_analyzer},
     file_manager_ {file_manager},
     system_monitor_ {system_monitor}
@@ -112,7 +112,7 @@ void Application::AcquisitionLoop() {
       if (sample_count % 250 == 0) {
         std::cout << "Samples collected: " << sample_count 
                   << " | Buffer size: " << buffer_raw_->Size()
-                  << " | Last voltage: " << sample.voltage << "V" << std::endl;
+                  << std::endl;
       }
     #endif
     

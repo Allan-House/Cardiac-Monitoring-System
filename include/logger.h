@@ -72,16 +72,16 @@ namespace cardiac_logger {
     void format_timestamp(uint64_t timestamp_us, char* buffer, size_t buffer_size) {
       time_t seconds = timestamp_us / 1000000;
       int microseconds = timestamp_us % 1000000;
-          
-      struct tm* tm_info = localtime(&seconds);
-      strftime(buffer, buffer_size, "%Y-%m-%d %H:%M:%S", tm_info);
-          
-      // Add microseconds
-      char temp[32];
-      snprintf(temp, sizeof(temp), ".%06d", microseconds);
-      strncat(buffer, temp, buffer_size - strlen(buffer) - 1);
+
+      struct tm tm_info;
+      localtime_r(&seconds, &tm_info);
+
+      int len = std::strftime(buffer, buffer_size, "%Y-%m-%d %H:%M:%S", &tm_info);
+      if (len > 0 && (size_t)len < buffer_size) {
+        std::snprintf(buffer + len, buffer_size - len, ".%06d", microseconds);
+      }
     }
-      
+
     const char* level_to_string(Level level) {
       switch (level) {
         case Level::kCritical: return "CRIT";
