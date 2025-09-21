@@ -107,49 +107,63 @@ def plot_ecg(voltages, timestamps, classifications, filename, file_type):
   fig, ax = plt.subplots(figsize=(15, 6), dpi=100)
 
   # Plot do sinal ECG
-  ax.plot(time_sec, voltages, label="ECG Signal", linewidth=1, color='blue')
+  ecg_line = ax.plot(time_sec, voltages, label="ECG Signal", linewidth=1, color='blue')
+
+  # Preparar handles e labels para controle da ordem da legenda
+  legend_handles = [ecg_line[0]]
+  legend_labels = ["ECG Signal"]
 
   # Se houver classificações, marcar os pontos de interesse
   if classifications is not None:
     # Definir cores e marcadores para cada tipo de classificação
     classification_styles = {
-      'R': {'color': 'red', 'marker': 'o', 'size': 50, 'label': 'R'},
-      'Q': {'color': 'darkgoldenrod', 'marker': 'o', 'size': 40, 'label': 'Q'},
-      'S': {'color': 'darkblue', 'marker': 'o', 'size': 40, 'label': 'S'}
+      'P': {'color': 'green', 'marker': 'o', 'size': 35, 'label': 'P Wave'},
+      'Q': {'color': 'darkgoldenrod', 'marker': 'o', 'size': 40, 'label': 'Q Wave'},
+      'R': {'color': 'red', 'marker': 'o', 'size': 50, 'label': 'R Wave'},
+      'S': {'color': 'darkblue', 'marker': 'o', 'size': 40, 'label': 'S Wave'},
+      'T': {'color': 'purple', 'marker': 'o', 'size': 35, 'label': 'T Wave'}
     }
     
-    # Agrupar pontos por classificação para eficiência (ignorar N, P, T)
+    # Agrupar pontos por classificação para eficiência
     classification_groups = {}
     for i, classification in enumerate(classifications):
-      if classification in classification_styles:  # Apenas R, Q, S
+      if classification in classification_styles:  # P, Q, R, S, T
         if classification not in classification_groups:
           classification_groups[classification] = {'times': [], 'voltages': []}
         classification_groups[classification]['times'].append(time_sec[i])
         classification_groups[classification]['voltages'].append(voltages[i])
     
-    # Plotar cada grupo de classificação
-    for classification, data in classification_groups.items():
-      style = classification_styles[classification]
-      ax.scatter(data['times'], data['voltages'], 
-                c=style['color'], 
-                marker=style['marker'], 
-                s=style['size'],
-                label=style['label'],
-                alpha=0.9,
-                zorder=3)
+    # Plotar na ordem desejada: P, Q, R, S, T
+    desired_order = ['P', 'Q', 'R', 'S', 'T']
+    for classification in desired_order:
+      if classification in classification_groups:
+        data = classification_groups[classification]
+        style = classification_styles[classification]
+        scatter = ax.scatter(data['times'], data['voltages'], 
+                          c=style['color'], 
+                          marker=style['marker'], 
+                          s=style['size'],
+                          alpha=0.9,
+                          zorder=3)
+        legend_handles.append(scatter)
+        legend_labels.append(style['label'])
     
     if len(classification_groups) > 0:
       print(f"Pontos marcados por classificação:")
-      for classification, data in classification_groups.items():
-        print(f"  {classification}: {len(data['times'])} pontos")
+      for classification in desired_order:
+        if classification in classification_groups:
+          data = classification_groups[classification]
+          print(f"  {classification}: {len(data['times'])} pontos")
     else:
-      print("Nenhum ponto R, Q ou S encontrado para marcação")
+      print("Nenhum ponto P, Q, R, S ou T encontrado para marcação")
 
   ax.axhline(0, color="black", linestyle='-', alpha=0.3)
   ax.set_xlabel("Time (s)")
   ax.set_ylabel("Voltage (V)")
   ax.set_title(f'ECG Data from {os.path.basename(filename)}')
-  ax.legend()
+  
+  # Controlar ordem da legenda explicitamente
+  ax.legend(legend_handles, legend_labels)
   ax.grid(True, alpha=0.3)
 
   plt.tight_layout()
@@ -181,8 +195,8 @@ def main():
     print(f"Duration: {(timestamps[-1] - timestamps[0]) / 1e6:.2f} seconds")
     
     if classifications is not None:
-      marked_points = len([c for c in classifications if c in ['R', 'Q', 'S']])
-      print(f"Classifications available: {marked_points} marked points (R, Q, S)")
+      marked_points = len([c for c in classifications if c in ['R', 'Q', 'S', 'P', 'T']])
+      print(f"Classifications available: {marked_points} marked points (R, Q, S, P, T)")
     else:
       print("No classification data available (binary file or CSV without classification column)")
 

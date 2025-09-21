@@ -208,24 +208,9 @@ void ECGAnalyzer::DetectTWave() {
 
 void ECGAnalyzer::FinalizeDetection() {
   TransferToClassifiedBuffer();
-  
-  // Limpar dados processados até o final da onda T (ou todo o buffer)
-  // Manter algumas amostras para continuidade se necessário
-  const size_t samples_to_keep {50}; // Manter 200ms para sobreposição
-  
-  if (processed_samples_.size() > samples_to_keep) {
-    size_t samples_to_remove {processed_samples_.size() - samples_to_keep};
-    processed_samples_.erase(processed_samples_.begin(), 
-                           processed_samples_.begin() + samples_to_remove);
-    
-    // Ajustar índices se necessário para as próximas detecções
-    // (caso mantenha dados para sobreposição)
-  } else {
-    processed_samples_.clear();
-  }
-  
+  processed_samples_.clear();
+  p_index_ = q_index_ = r_index_ = s_index_ = t_index_ = 0;
   state_ = States::kSearchingR;
-  
   LOG_DEBUG("P-QRS-T detection cycle completed");
 }
 
