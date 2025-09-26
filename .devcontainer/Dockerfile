@@ -13,6 +13,7 @@ RUN apt update && apt install -y --no-install-recommends \
     curl \
     gcc-aarch64-linux-gnu \
     g++-aarch64-linux-gnu \
+    gdb \
     binutils-aarch64-linux-gnu \
     nano \
     vim \

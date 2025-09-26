@@ -39,8 +39,6 @@ bool Application::Start() {
     return false;
   }
 
-  // TODO (allan): Adicionar verificação de data source.
-
   if (!file_manager_->Init()) {
     return false;
   }

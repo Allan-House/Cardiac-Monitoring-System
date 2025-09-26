@@ -94,7 +94,6 @@ class RingBuffer {
     auto value = buffer_.at(tail_);
     full_ = false;
     tail_ = (tail_ + 1) % max_size_;
-
     return value;
   }
 
