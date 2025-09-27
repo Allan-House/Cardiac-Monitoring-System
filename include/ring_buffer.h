@@ -6,23 +6,13 @@
 #include <mutex>
 #include <optional>
 #include <vector>
+#include <atomic>
 
-// TODO (allan): atualizar documentação.
-
-/**
- * @brief Thread-safe circular buffer implementation using a ring buffer data structure.
- * 
- * This class implements a fixed-size circular buffer that automatically overwrites
- * the oldest data when the buffer is full. All operations are thread-safe through
- * the use of mutex locks.
- * 
- * @tparam T The type of elements stored in the buffer
- */
 template <class T>
 class RingBuffer {
   private:
-  std::vector<T> buffer_; // TODO (allan): array?  
-  std::mutex mutex_;
+  std::vector<T> buffer_;
+  mutable std::mutex mutex_;
   std::condition_variable data_added_;
 
   size_t head_ {0};
@@ -30,14 +20,10 @@ class RingBuffer {
   
   const size_t max_size_;
   bool full_ {false};
+  std::atomic<bool> shutdown_ {false};
   
   public:
-  /**
-   * @brief Constructs a RingBuffer with the specified capacity.
-   * 
-   * @param size The maximum number of elements the buffer can hold
-   * @throw std::bad_alloc if memory allocation fails for the internal vector
-   */
+
   explicit RingBuffer(size_t size) :
     buffer_(size),
     max_size_ {size}
@@ -45,17 +31,13 @@ class RingBuffer {
     // Empty constructor.
   }
   
-  /**
-   * @brief Adds a new element to the buffer.
-   * 
-   * If the buffer is full, the oldest element will be overwritten.
-   * This operation is thread-safe.
-   * 
-   * @param data The element to add to the buffer
-   */
   void AddData(T data) {
     {
       std::lock_guard<std::mutex> lock(mutex_);
+
+      if (shutdown_.load()) {
+        return; // Don't add data after shutdown
+      }
 
       buffer_.at(head_) = data;
 
@@ -69,27 +51,21 @@ class RingBuffer {
     data_added_.notify_one();
   }
 
-  /**
-   * @brief Returns the oldest element without removing it from the buffer.
-   * 
-   * @return std::optional<T> The oldest element if buffer is not empty, 
-   *         std::nullopt otherwise
-   */
-  T Front() const {
-    std::unique_lock<std::mutex> lock(mutex_);
-    data_added_.wait(lock, [this]{return !Empty();});   
+  std::optional<T> Front() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (Empty() || shutdown_.load()) {
+      return std::nullopt;
+    }
     return buffer_.at(tail_);
   }
 
-  /**
-   * @brief Removes and returns the oldest element from the buffer.
-   * 
-   * @return std::optional<T> The oldest element if buffer is not empty,
-   *         std::nullopt otherwise
-   */
-  T Consume() {
+  std::optional<T> Consume() {
     std::unique_lock<std::mutex> lock(mutex_);
-    data_added_.wait(lock, [this]{return !Empty();});
+    data_added_.wait(lock, [this]{return !Empty() || shutdown_.load();});
+    
+    if (shutdown_.load() && Empty()) {
+      return std::nullopt;  // Ao invés de exception
+    }
 
     auto value = buffer_.at(tail_);
     full_ = false;
@@ -97,46 +73,52 @@ class RingBuffer {
     return value;
   }
 
-  /**
-   * @brief Clears all elements from the buffer.
-   * 
-   * Resets the buffer to an empty state by setting head equal to tail.
-   */
+  std::optional<T> TryConsume() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (Empty() || shutdown_.load()) {
+      return std::nullopt;
+    }
+
+    auto value = buffer_.at(tail_);
+    full_ = false;
+    tail_ = (tail_ + 1) % max_size_;
+    return value;
+  }
+
+  void Shutdown() {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      shutdown_.store(true);
+    }
+    data_added_.notify_all();
+  }
+
   void Reset() {
     std::lock_guard<std::mutex> lock(mutex_);
     head_ = tail_;
     full_ = false;
+    shutdown_.store(false);
   }
   
-  /**
-   * @brief Checks if the buffer is empty.
-   * 
-   * @return true if the buffer contains no elements, false otherwise
-   */
-  bool Empty() const {return !full_ && (head_ == tail_);}
+  bool Empty() const {
+    return !full_ && (head_ == tail_);
+  }
   
-  /**
-   * @brief Checks if the buffer is full.
-   * 
-   * @return true if the buffer has reached its maximum capacity, false otherwise
-   */
-  bool Full() const {return full_;}
+  bool Full() const {
+    return full_;
+  }
 
-  /**
-   * @brief Returns the maximum capacity of the buffer.
-   * 
-   * @return The maximum number of elements the buffer can hold
-   */
-  size_t Capacity() const {return max_size_;}
+  bool IsShutdown() const {
+    return shutdown_.load();
+  }
 
-  /**
-   * @brief Returns the current number of elements in the buffer.
-   * 
-   * Calculates the current size based on the head and tail positions.
-   * 
-   * @return The number of elements currently stored in the buffer
-   */
+  size_t Capacity() const {
+    return max_size_;
+  }
+
   size_t Size() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     size_t size = max_size_;
 
     if (!full_) {

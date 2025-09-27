@@ -60,6 +60,7 @@ void Application::Run() {
     return;
   }
 
+  // Start all processing threads
   acquisition_thread_ = std::thread(&Application::AcquisitionLoop, this);
   ecg_analyzer_->Run();
   file_manager_->Run();
@@ -70,20 +71,26 @@ void Application::Run() {
     acquisition_thread_.join();
   }
 
+  LOG_INFO("Acquisition finished, stopping processing threads...");
+
   ecg_analyzer_->Stop();
   file_manager_->Stop();
-  // system_monitor_->Run();
+  // system_monitor_->Stop();
+
+  LOG_SUCCESS("All threads stopped successfully");
 }
   
 void Application::Stop() {
   if (running_) {
+    LOG_INFO("Stopping application...");
     running_ = false;
-  }
 
-  LOG_SUCCESS("Application stopped");
+    buffer_raw_->Shutdown();
+    
+    LOG_SUCCESS("Application stopped");
+  }
 }
 
-// TODO (allan): adicionar tratamento de exceção?
 void Application::AcquisitionLoop() {
   LOG_INFO("Starting acquisition for %ld seconds.", acquisition_duration_.count());
 
@@ -95,34 +102,52 @@ void Application::AcquisitionLoop() {
   #endif
   
   uint32_t expected_sample {0};
-  while (std::chrono::steady_clock::now() < end_time) {
-    expected_sample++;
-    
-    auto target_time = start_time + (expected_sample * kSamplePeriod);
-    
-    std::this_thread::sleep_until(target_time);
-    
-    Sample sample{data_source_->ReadVoltage(), std::chrono::steady_clock::now()};
-    buffer_raw_->AddData(sample);
-
-    #ifdef DEBUG
-      sample_count++;
-      if (sample_count % 250 == 0) {
-        std::cout << "Samples collected: " << sample_count 
-                  << " | Buffer size: " << buffer_raw_->Size()
-                  << std::endl;
+  
+  try {
+    while (running_.load() && std::chrono::steady_clock::now() < end_time) {
+      expected_sample++;
+      
+      auto target_time = start_time + (expected_sample * kSamplePeriod);
+      
+      std::this_thread::sleep_until(target_time);
+      
+      // Check if we should stop
+      if (!running_.load()) {
+        break;
       }
-    #endif
-    
-    // Auto-correction: if too late, skip a sample
-    auto now = std::chrono::steady_clock::now();
-    auto delay = std::chrono::duration_cast<std::chrono::microseconds>(now - target_time).count();
-    
-    if (delay > 2000) { // If more than 2ms late
-      LOG_WARN("High delay detected: %ldμs, skipping to catch up", delay);
-      expected_sample = std::chrono::duration_cast<std::chrono::microseconds>(now - start_time).count() / 4000;
+      
+      Sample sample{data_source_->ReadVoltage(), std::chrono::steady_clock::now()};
+      buffer_raw_->AddData(sample);
+
+      #ifdef DEBUG
+        sample_count++;
+        if (sample_count % 250 == 0) {
+          std::cout << "Samples collected: " << sample_count 
+                    << " | Buffer size: " << buffer_raw_->Size()
+                    << std::endl;
+        }
+      #endif
+      
+      // Auto-correction: if too late, skip a sample
+      auto now = std::chrono::steady_clock::now();
+      auto delay = std::chrono::duration_cast<std::chrono::microseconds>(now - target_time).count();
+      
+      if (delay > 2000) { // If more than 2ms late
+        LOG_WARN("High delay detected: %ldμs, skipping to catch up", delay);
+        expected_sample = std::chrono::duration_cast<std::chrono::microseconds>(now - start_time).count() / 4000;
+      }
     }
+  } catch (const std::exception& e) {
+    LOG_ERROR("Exception in acquisition loop: %s", e.what());
   }
 
   LOG_INFO("Acquisition duration completed.");
+  
+  // Signal that acquisition is done
+  running_ = false;
+  
+  // Signal shutdown to raw buffer to wake up waiting threads
+  buffer_raw_->Shutdown();
+  
+  LOG_INFO("Acquisition loop finished, signaled shutdown to processing threads");
 }

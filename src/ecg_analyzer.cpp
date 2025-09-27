@@ -24,6 +24,9 @@ void ECGAnalyzer::Stop() {
 
   processing_ = false;
 
+  // Signal shutdown to input buffer to wake up waiting threads
+  buffer_raw_->Shutdown();
+
   if (processing_thread_.joinable()) {
     processing_thread_.join();
   }
@@ -38,32 +41,53 @@ void ECGAnalyzer::ProcessingLoop() {
   uint32_t sample_count {0};
   #endif
 
-  // Real-time processing
+  // Real-time processing with proper shutdown handling
   while (processing_) {
-    Sample raw {buffer_raw_->Consume()};
+    auto sample_opt = buffer_raw_->Consume();
     
-    Sample processed = raw; // TODO: implementar pré-processamento aqui
+    if (!sample_opt) {
+      // Buffer shutdown or empty - exit gracefully
+      LOG_INFO("Processing interrupted - buffer shutdown");
+      break;
+    }
+    
+    Sample processed = sample_opt.value(); // TODO: implementar pré-processamento aqui
     processed_samples_.push_back(processed);
 
     FSMExecute();
+
+    #ifdef DEBUG
+    sample_count++;
+    if (sample_count % 1000 == 0) {
+      LOG_DEBUG("Processed %u samples", sample_count);
+    }
+    #endif
   }
 
   LOG_INFO("Processing remaining samples in buffer...");
-  while (!buffer_raw_->Empty()) {
-    Sample raw {buffer_raw_->Consume()};
-    
-    Sample processed = raw; // TODO: implementar pré-processamento aqui
+  
+  // Process remaining samples using non-blocking method
+  std::optional<Sample> sample_opt;
+  while ((sample_opt = buffer_raw_->TryConsume())) {
+    Sample processed = sample_opt.value(); // TODO: implementar pré-processamento aqui
     processed_samples_.push_back(processed);
-
     FSMExecute();
   }
 
-  // TODO
-  // Processar amostras restantes se estivermos aguardando buffer completo
-  if (state_ == States::kWaitingBuffer) {
-    LOG_WARN("ECG acquisition ended while waiting for complete buffer");
-    // Tentar processar com buffer incompleto ou descartar
+  // Handle any incomplete detection cycles
+  if (state_ != States::kSearchingR && !processed_samples_.empty()) {
+    LOG_WARN("ECG acquisition ended with incomplete detection cycle in state %d", 
+             static_cast<int>(state_));
+    
+    // Transfer remaining samples without complete classification
+    for (const auto& sample : processed_samples_) {
+      buffer_classified_->AddData(sample);
+    }
+    processed_samples_.clear();
   }
+
+  // Signal shutdown to output buffer
+  buffer_classified_->Shutdown();
 
   LOG_INFO("Processing thread finished.");
 }

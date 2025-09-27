@@ -27,10 +27,6 @@ std::shared_ptr<DataSource> createDataSource(int argc, char** argv);
  * 475 SPS x 300s -> 142500 samples
 */
 
-/* TODO (allan): Escolhas a serem feitas:
-- Instanciar os objetos estaticamente ou dinamicamente?
-- Argumentos possíveis.
-*/
 int main(int argc, char** argv) {
   cardiac_logger::init("cardiac_system.log", cardiac_logger::Level::kDebug);
 
@@ -50,9 +46,9 @@ int main(int argc, char** argv) {
   auto buffer_classified = std::make_shared<RingBuffer<Sample>>(75000);
   auto ecg_analyzer = std::make_shared<ECGAnalyzer>(buffer_raw, buffer_classified);
   auto file_manager = std::make_shared<FileManager>(
-    buffer_processed,
-    "cardiac_data",  // base filename, timestamp will be added
-    std::chrono::milliseconds(200) // 50 samples per write
+    buffer_classified,  // Fixed: was buffer_processed
+    "cardiac_data",     // base filename, timestamp will be added
+    std::chrono::milliseconds(200) // Write interval: 200ms
   );
   auto system_monitor = std::make_shared<SystemMonitor>();
   
@@ -63,11 +59,15 @@ int main(int argc, char** argv) {
                           file_manager,
                           system_monitor};
 
-  // TODO (allan): verificação de erro de Application::Start();
-  if (application.Start()) {
-    application.Run();
+  if (!application.Start()) {
+    LOG_ERROR("Failed to start application");
+    return 1;
   }
+   
+  application.Run();
 
+  LOG_SUCCESS("Application completed successfully");
+  cardiac_logger::shutdown();
   return 0;
 }
 

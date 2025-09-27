@@ -135,9 +135,11 @@ void FileManager::WriteAvailableData() {
   size_t batch_count {0};
   const size_t max_batch_size {100};
 
-  while (!buffer_->Empty() && batch_count < max_batch_size) {
-    sample = buffer_->Consume();
-    WriteSample(sample);
+  while (batch_count < max_batch_size) {
+    auto sample_opt = buffer_->Consume();
+    if (!sample_opt) break;  // Buffer empty or shutdown
+    
+    WriteSample(sample_opt.value());
     batch_count++;
     samples_written_++;
   }
@@ -198,11 +200,12 @@ void FileManager::FlushRemainingData() {
   }
 
   LOG_INFO("Writing remaining data...");
-  while (!buffer_->Empty()) {
-    sample = buffer_->Consume();
-    WriteSample(sample);
+  auto sample_opt = buffer_->Consume();
+  while (sample_opt) {
+    WriteSample(sample_opt.value());
     samples_written_++;
     final_count++;
+    sample_opt = buffer_->Consume();
   }
 
   if (final_count > 0) {
