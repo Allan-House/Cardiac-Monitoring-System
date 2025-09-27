@@ -47,8 +47,8 @@ int main(int argc, char** argv) {
   }
 
   auto buffer_raw = std::make_shared<RingBuffer<Sample>>(75000);
-  auto buffer_processed = std::make_shared<RingBuffer<Sample>>(75000);
-  auto ecg_analyzer = std::make_shared<ECGAnalyzer>(buffer_raw, buffer_processed);
+  auto buffer_classified = std::make_shared<RingBuffer<Sample>>(75000);
+  auto ecg_analyzer = std::make_shared<ECGAnalyzer>(buffer_raw, buffer_classified);
   auto file_manager = std::make_shared<FileManager>(
     buffer_processed,
     "cardiac_data",  // base filename, timestamp will be added
@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
   
   Application application{data_source,
                           buffer_raw,
-                          buffer_processed,
+                          buffer_classified,
                           ecg_analyzer,
                           file_manager,
                           system_monitor};

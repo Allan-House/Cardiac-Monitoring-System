@@ -13,8 +13,7 @@
 
 class Application {
   private:
-  // TODO (allan): tentar encontrar uma forma de correlacionar com a configuração
-  //               do ADS1115, mesmo que deixe de ser uma constexpr.
+  // TODO (allan): padronizar ao longo de todo o código.
   // Timing configurations
   static constexpr uint16_t kSampleRate{250};  // SPS
   static constexpr double kPeriodSeconds{1.0 / kSampleRate};  // 0.004 seconds
@@ -24,7 +23,7 @@ class Application {
   // External dependencies
   std::shared_ptr<DataSource> data_source_;
   std::shared_ptr<RingBuffer<Sample>> buffer_raw_;
-  std::shared_ptr<RingBuffer<Sample>> buffer_processed_;
+  std::shared_ptr<RingBuffer<Sample>> buffer_classified_;
   std::shared_ptr<ECGAnalyzer> ecg_analyzer_;
   std::shared_ptr<FileManager> file_manager_;
   std::shared_ptr<SystemMonitor> system_monitor_;
@@ -41,7 +40,7 @@ class Application {
   public:
   Application(std::shared_ptr<DataSource> data_source,
               std::shared_ptr<RingBuffer<Sample>> buffer_raw,
-              std::shared_ptr<RingBuffer<Sample>> buffer_processed,
+              std::shared_ptr<RingBuffer<Sample>> buffer_classified,
               std::shared_ptr<ECGAnalyzer> ecg_analyzer,
               std::shared_ptr<FileManager> file_manager,
               std::shared_ptr<SystemMonitor> system_monitor);
