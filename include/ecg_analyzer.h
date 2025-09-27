@@ -6,7 +6,6 @@
 #include <chrono>
 #include <memory>
 #include <thread>
-#include <array>
 #include <vector>
 
 enum class WaveType {
@@ -22,7 +21,6 @@ struct Sample {
   float voltage;
   std::chrono::steady_clock::time_point timestamp;
   WaveType classification {WaveType::kNormal};
-  // TODO (allan): adicionar index?
   
   Sample() : voltage(0.0f), timestamp(std::chrono::steady_clock::now()) {}
 
@@ -33,23 +31,38 @@ struct Sample {
     : voltage(v), timestamp(t), classification(type) {}
 };
 
-enum class States {
-  kSearchingR,
-  kWaitingBuffer,
-  kDetectingQ,
-  kDetectingS,
-  kDetectingP,
-  kDetectingT,
-  kFinalizing
+// Configuration constants (centralized)
+namespace ecg_config {
+  constexpr uint16_t kSampleRate = 250;  // SPS
+  constexpr float kRThreshold = 2.0f;    // R peak threshold
+  
+  // Detection windows (in samples) - exactly from the paper
+  constexpr size_t kQSWindow = kSampleRate * 80 / 1000;   // 80ms = 20 samples
+  constexpr size_t kPWindow = kSampleRate * 200 / 1000;   // 200ms = 50 samples  
+  constexpr size_t kTWindow = kSampleRate * 400 / 1000;   // 400ms = 100 samples
+  
+  // Refractory period to avoid double detection
+  constexpr size_t kRefractoryPeriod = kSampleRate * 300 / 1000; // 300ms = 75 samples
+}
+
+struct Beat {
+  size_t r_pos;
+  size_t q_pos = 0;
+  size_t s_pos = 0;
+  size_t p_pos = 0;
+  size_t t_pos = 0;
+  bool qrs_complete = false;
+  bool p_complete = false;
+  bool t_complete = false;
+  
+  Beat(size_t r) : r_pos(r) {}
 };
 
 class ECGAnalyzer {
   private:
-  // TODO (allan): criar um threshold adaptativo.
-  static constexpr float kThreshold {2.0f};
-  
-  // Buffers e dados
-  std::vector<Sample> processed_samples_;
+  // Buffers
+  std::vector<Sample> sample_buffer_;
+  std::vector<Beat> detected_beats_;
   std::shared_ptr<RingBuffer<Sample>> buffer_raw_;
   std::shared_ptr<RingBuffer<Sample>> buffer_classified_;
   
@@ -57,28 +70,8 @@ class ECGAnalyzer {
   std::atomic<bool> processing_ {false};
   std::thread processing_thread_;
   
-  // Estado da máquina de estados
-  States state_ {States::kSearchingR};
-  
-  // Pontos de onda detectados: P, Q, R, S, T
-  std::array<Sample, 5> wave_points_; // 0=P, 1=Q, 2=R, 3=S, 4=T
-  
-  // Configurações de amostragem
-  // TODO (allan): padronizar ao longo de todo o código.
-  static constexpr uint16_t kSampleRate{250};  // SPS
-  static constexpr double kPeriodSeconds{1.0 / kSampleRate};  // 0.004 seconds
-  
-  // Constantes de tempo para detecção (em amostras)
-  static constexpr size_t kSamples80ms{20};   // 80ms for Q and S
-  static constexpr size_t kSamples200ms{50};  // 200ms for P
-  static constexpr size_t kSamples400ms{100}; // 400ms for T
-  
-  // Índices dos pontos detectados
-  size_t p_index_ {0};
-  size_t q_index_ {0};
-  size_t r_index_ {0};
-  size_t s_index_ {0};
-  size_t t_index_ {0};
+  // State tracking
+  size_t last_transferred_pos_ = 0;
 
   public:
   ECGAnalyzer(std::shared_ptr<RingBuffer<Sample>> buffer_raw,
@@ -89,20 +82,22 @@ class ECGAnalyzer {
 
   private:
   void ProcessingLoop();
-  void FSMExecute();
+  void ProcessSample(const Sample& sample);
   
-  // Funções de detecção
-  void SearchRPeak();
-  void CheckBufferSize();
-  bool DetectRPeak();
-  void DetectQPoint();
-  void DetectSPoint();
-  void DetectPWave();
-  void DetectTWave();
+  void DetectRPeaks();
+  void ProcessCompleteBeats();
+  void TransferProcessedSamples();
+  void ProcessFinalData();
   
-  // Finalização
-  void FinalizeDetection();
-  void TransferToClassifiedBuffer();
+  bool IsRPeak(size_t pos) const;
+  bool CanCompleteQRS(size_t r_pos) const;
+  bool CanCompleteP(size_t q_pos) const;
+  bool CanCompleteT(size_t s_pos) const;
+  
+  size_t FindLowest(size_t start, size_t end) const;
+  size_t FindHighest(size_t start, size_t end) const;
+  
+  void ApplyClassifications();
 };
 
 #endif

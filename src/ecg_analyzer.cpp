@@ -4,14 +4,15 @@
 #include <cstdint>
 #include <thread>
 #include <iostream>
-#include <cstdlib>
 
 ECGAnalyzer::ECGAnalyzer(std::shared_ptr<RingBuffer<Sample>> buffer_raw,
                          std::shared_ptr<RingBuffer<Sample>> buffer_classified)
   : buffer_raw_ {buffer_raw},
     buffer_classified_ {buffer_classified}
 {
-  // Empty constructor.
+  // Reserve space to avoid reallocations during execution
+  sample_buffer_.reserve(20000); // ~80 seconds at 250Hz
+  detected_beats_.reserve(200);   // ~200 beats max
 }
 
 void ECGAnalyzer::Run() {
@@ -23,8 +24,6 @@ void ECGAnalyzer::Stop() {
   LOG_INFO("Stopping ECG processing thread...");
 
   processing_ = false;
-
-  // Signal shutdown to input buffer to wake up waiting threads
   buffer_raw_->Shutdown();
 
   if (processing_thread_.joinable()) {
@@ -35,227 +34,265 @@ void ECGAnalyzer::Stop() {
 }
 
 void ECGAnalyzer::ProcessingLoop() {
-  LOG_INFO("Starting processing thread...");
+  LOG_INFO("Starting ECG processing thread...");
 
   #ifdef DEBUG
-  uint32_t sample_count {0};
+  uint32_t sample_count = 0;
   #endif
 
-  // Real-time processing with proper shutdown handling
+  // Real-time processing loop
   while (processing_) {
     auto sample_opt = buffer_raw_->Consume();
     
     if (!sample_opt) {
-      // Buffer shutdown or empty - exit gracefully
       LOG_INFO("Processing interrupted - buffer shutdown");
       break;
     }
     
-    Sample processed = sample_opt.value(); // TODO: implementar pré-processamento aqui
-    processed_samples_.push_back(processed);
-
-    FSMExecute();
+    ProcessSample(sample_opt.value());
 
     #ifdef DEBUG
     sample_count++;
     if (sample_count % 1000 == 0) {
-      LOG_DEBUG("Processed %u samples", sample_count);
+      LOG_DEBUG("Processed %u samples, detected %zu beats", 
+                sample_count, detected_beats_.size());
     }
     #endif
   }
 
   LOG_INFO("Processing remaining samples in buffer...");
   
-  // Process remaining samples using non-blocking method
-  std::optional<Sample> sample_opt;
-  while ((sample_opt = buffer_raw_->TryConsume())) {
-    Sample processed = sample_opt.value(); // TODO: implementar pré-processamento aqui
-    processed_samples_.push_back(processed);
-    FSMExecute();
+  // Process remaining samples
+  auto sample_opt = buffer_raw_->Consume();
+  while (sample_opt) {
+    ProcessSample(sample_opt.value());
+    sample_opt = buffer_raw_->Consume();
   }
 
-  // Handle any incomplete detection cycles
-  if (state_ != States::kSearchingR && !processed_samples_.empty()) {
-    LOG_WARN("ECG acquisition ended with incomplete detection cycle in state %d", 
-             static_cast<int>(state_));
-    
-    // Transfer remaining samples without complete classification
-    for (const auto& sample : processed_samples_) {
-      buffer_classified_->AddData(sample);
-    }
-    processed_samples_.clear();
-  }
-
-  // Signal shutdown to output buffer
+  // Final processing
+  ProcessFinalData();
+  
   buffer_classified_->Shutdown();
-
   LOG_INFO("Processing thread finished.");
 }
 
-void ECGAnalyzer::FSMExecute() {
-  switch (state_) {
-    case States::kSearchingR:
-      SearchRPeak();
-      break;
-    case States::kWaitingBuffer:
-      CheckBufferSize();
-      break;
-    case States::kDetectingQ:
-      DetectQPoint();
-      state_ = States::kDetectingS;
-      break;
-    case States::kDetectingS:
-      DetectSPoint();
-      state_ = States::kDetectingP;
-      break;
-    case States::kDetectingP:
-      DetectPWave();
-      state_ = States::kDetectingT;
-      break;
-    case States::kDetectingT:
-      DetectTWave();
-      state_ = States::kFinalizing;
-      break;
-    case States::kFinalizing:
-      FinalizeDetection();
-      break;
+void ECGAnalyzer::ProcessSample(const Sample& sample) {
+  sample_buffer_.push_back(sample);
+  
+  // Step 2: Detect R-peaks (need at least 3 samples for peak detection)
+  if (sample_buffer_.size() >= 3) {
+    DetectRPeaks();
+  }
+  
+  // Steps 4-7: Process complete beats when we have enough data
+  ProcessCompleteBeats();
+  
+  // Transfer processed samples to output buffer
+  TransferProcessedSamples();
+}
+
+void ECGAnalyzer::DetectRPeaks() {
+  // Check the sample before current (with 1 sample delay for reliable peak detection)
+  size_t check_pos = sample_buffer_.size() - 2;
+  
+  if (IsRPeak(check_pos)) {
+    detected_beats_.emplace_back(check_pos);
+    LOG_DEBUG("R peak detected at position %zu", check_pos);
   }
 }
 
-void ECGAnalyzer::SearchRPeak() {
-  if (processed_samples_.size() < 3) {
-    return;
+bool ECGAnalyzer::IsRPeak(size_t pos) const {
+  if (pos == 0 || pos >= sample_buffer_.size() - 1) {
+    return false;
   }
-
-  // Analysis with 1 sample lag
-  size_t analyze_index = processed_samples_.size() - 2;
   
-  bool is_peak = processed_samples_.at(analyze_index).voltage > processed_samples_.at(analyze_index - 1).voltage &&
-                 processed_samples_.at(analyze_index).voltage > processed_samples_.at(analyze_index + 1).voltage &&
-                 processed_samples_.at(analyze_index).voltage > kThreshold;
-
-  if (is_peak) {
-    r_index_ = analyze_index;
-    wave_points_.at(1) = processed_samples_.at(r_index_); // R peak
-    state_ = States::kWaitingBuffer;
-  }
-}
-
-void ECGAnalyzer::CheckBufferSize() {
-  // TODO (allan): criar constantes relacionando com as configurações.
-  // Calculations for 250 Hz:
-  // - 80ms = 20 samples (Q and S)
-  // - 200ms = 50 samples (P wave)
-  // - 400ms = 100 samples (T wave)
+  const Sample& prev = sample_buffer_[pos - 1];
+  const Sample& curr = sample_buffer_[pos];
+  const Sample& next = sample_buffer_[pos + 1];
   
-  size_t samples_before_r {r_index_};
-  size_t samples_after_r {processed_samples_.size() - r_index_ - 1};
+  // Peak detection: higher than neighbors and above threshold
+  bool is_peak = (curr.voltage > prev.voltage) && 
+                 (curr.voltage > next.voltage) && 
+                 (curr.voltage > ecg_config::kRThreshold);
   
-  // Check what detection is possible with available data
-  bool has_qrs_data {samples_before_r >= kSamples80ms && samples_after_r >= kSamples80ms};
-  bool has_p_data {samples_before_r >= (kSamples200ms + kSamples80ms)};
-  bool has_t_data {samples_after_r >= (kSamples80ms + kSamples400ms)};
-  
-  if (has_qrs_data) {   
-    state_ = States::kDetectingQ;
-  }
-}
-
-void ECGAnalyzer::DetectQPoint() {  
-  size_t begin {r_index_ - kSamples80ms};
-  float lowest {processed_samples_.at(begin).voltage};
-  q_index_ = begin;
-  
-  for (size_t i = begin; i < r_index_; i++) {
-    if (processed_samples_.at(i).voltage < lowest) {
-      lowest = processed_samples_.at(i).voltage;
-      q_index_ = i;
+  // Refractory period: avoid detecting peaks too close together
+  if (is_peak && !detected_beats_.empty()) {
+    size_t last_r = detected_beats_.back().r_pos;
+    if (pos - last_r < ecg_config::kRefractoryPeriod) {
+      return false;
     }
   }
   
-  wave_points_.at(0) = processed_samples_.at(q_index_); // Q point
+  return is_peak;
 }
 
-void ECGAnalyzer::DetectSPoint() { 
-  size_t end {r_index_ + kSamples80ms};
-  float lowest {processed_samples_.at(r_index_ + 1).voltage};
-  s_index_ = r_index_ + 1;
-  
-  for (size_t i = r_index_ + 1; i <= end; i++) {
-    if (processed_samples_.at(i).voltage < lowest) {
-      lowest = processed_samples_.at(i).voltage;
-      s_index_ = i;
-    }
-  }
-  
-  wave_points_.at(2) = processed_samples_.at(s_index_); // S point
-}
-
-void ECGAnalyzer::DetectPWave() {
-  if (r_index_ < (kSamples200ms + kSamples80ms)) {
-    return;
-  }
-
-  size_t begin {q_index_ - kSamples200ms};
-  float highest {processed_samples_.at(begin).voltage};
-  p_index_ = begin;
-  
-  for (size_t i = begin; i < q_index_; i++) {
-    if (processed_samples_.at(i).voltage > highest) {
-      highest = processed_samples_.at(i).voltage;
-      p_index_ = i;
-    }
-  }
-  
-  wave_points_.at(3) = processed_samples_.at(p_index_); // P wave
-}
-
-void ECGAnalyzer::DetectTWave() {
-  size_t samples_after_r = processed_samples_.size() - r_index_ - 1;
-  if (samples_after_r < (kSamples80ms + kSamples400ms)) {
-    return;
-  }
-
-  size_t end {s_index_ + kSamples400ms};
-  float highest {processed_samples_.at(s_index_ + 1).voltage};
-  t_index_ = s_index_ + 1;
-  
-  for (size_t i = s_index_ + 1; i <= end; i++) {
-    if (processed_samples_.at(i).voltage > highest) {
-      highest = processed_samples_.at(i).voltage;
-      t_index_ = i;
-    }
-  }
-  
-  wave_points_.at(4) = processed_samples_.at(t_index_); // T wave
-}
-
-void ECGAnalyzer::FinalizeDetection() {
-  TransferToClassifiedBuffer();
-  processed_samples_.clear();
-  p_index_ = q_index_ = r_index_ = s_index_ = t_index_ = 0;
-  state_ = States::kSearchingR;
-  LOG_DEBUG("P-QRS-T detection cycle completed");
-}
-
-void ECGAnalyzer::TransferToClassifiedBuffer() {
-  for (size_t i = 0; i < processed_samples_.size(); i++) {
-    Sample classified_sample = processed_samples_.at(i);
+void ECGAnalyzer::ProcessCompleteBeats() {
+  for (auto& beat : detected_beats_) {
     
-    if (i == p_index_) {
-      classified_sample.classification = WaveType::kP;
-    } else if (i == q_index_) {
-      classified_sample.classification = WaveType::kQ;
-    } else if (i == r_index_) {
-      classified_sample.classification = WaveType::kR;
-    } else if (i == s_index_) {
-      classified_sample.classification = WaveType::kS;
-    } else if (i == t_index_) {
-      classified_sample.classification = WaveType::kT;
+    // Step 4-5: Detect QRS complex (Q and S points)
+    if (!beat.qrs_complete && CanCompleteQRS(beat.r_pos)) {
+      // Q point: lowest signal value in 80ms before R
+      size_t q_start = beat.r_pos - ecg_config::kQSWindow;
+      beat.q_pos = FindLowest(q_start, beat.r_pos);
+      
+      // S point: lowest signal value in 80ms after R
+      size_t s_end = beat.r_pos + ecg_config::kQSWindow;
+      beat.s_pos = FindLowest(beat.r_pos + 1, s_end);
+      
+      beat.qrs_complete = true;
+      LOG_DEBUG("QRS complex completed for beat at %zu", beat.r_pos);
     }
     
-    buffer_classified_->AddData(classified_sample);
+    // Step 6: Detect P wave (highest in 200ms before Q)
+    if (beat.qrs_complete && !beat.p_complete && CanCompleteP(beat.q_pos)) {
+      size_t p_start = beat.q_pos - ecg_config::kPWindow;
+      beat.p_pos = FindHighest(p_start, beat.q_pos);
+      beat.p_complete = true;
+      LOG_DEBUG("P wave completed for beat at %zu", beat.r_pos);
+    }
+    
+    // Step 7: Detect T wave (highest in 400ms after S)
+    if (beat.qrs_complete && !beat.t_complete && CanCompleteT(beat.s_pos)) {
+      size_t t_end = beat.s_pos + ecg_config::kTWindow;
+      beat.t_pos = FindHighest(beat.s_pos + 1, t_end);
+      beat.t_complete = true;
+      LOG_DEBUG("T wave completed for beat at %zu", beat.r_pos);
+    }
+  }
+}
+
+bool ECGAnalyzer::CanCompleteQRS(size_t r_pos) const {
+  return (r_pos >= ecg_config::kQSWindow) && 
+         (r_pos + ecg_config::kQSWindow < sample_buffer_.size());
+}
+
+bool ECGAnalyzer::CanCompleteP(size_t q_pos) const {
+  return q_pos >= ecg_config::kPWindow;
+}
+
+bool ECGAnalyzer::CanCompleteT(size_t s_pos) const {
+  return s_pos + ecg_config::kTWindow < sample_buffer_.size();
+}
+
+size_t ECGAnalyzer::FindLowest(size_t start, size_t end) const {
+  if (start >= sample_buffer_.size() || end >= sample_buffer_.size() || start >= end) {
+    return start;
   }
   
-  LOG_DEBUG("Transferred %zu classified samples to buffer", processed_samples_.size());
+  size_t lowest_idx = start;
+  float lowest_value = sample_buffer_[start].voltage;
+  
+  for (size_t i = start + 1; i <= end; i++) {
+    if (sample_buffer_[i].voltage < lowest_value) {
+      lowest_value = sample_buffer_[i].voltage;
+      lowest_idx = i;
+    }
+  }
+  
+  return lowest_idx;
+}
+
+size_t ECGAnalyzer::FindHighest(size_t start, size_t end) const {
+  if (start >= sample_buffer_.size() || end >= sample_buffer_.size() || start >= end) {
+    return start;
+  }
+  
+  size_t highest_idx = start;
+  float highest_value = sample_buffer_[start].voltage;
+  
+  for (size_t i = start + 1; i <= end; i++) {
+    if (sample_buffer_[i].voltage > highest_value) {
+      highest_value = sample_buffer_[i].voltage;
+      highest_idx = i;
+    }
+  }
+  
+  return highest_idx;
+}
+
+void ECGAnalyzer::TransferProcessedSamples() {
+  if (sample_buffer_.size() <= ecg_config::kTWindow) {
+    return;
+  }
+  
+  size_t safe_transfer_pos = sample_buffer_.size() - ecg_config::kTWindow;
+  
+  if (safe_transfer_pos <= last_transferred_pos_) {
+    return;
+  }
+  
+  ApplyClassifications();
+  
+  // Transfer samples
+  for (size_t i = last_transferred_pos_; i < safe_transfer_pos; i++) {
+    buffer_classified_->AddData(sample_buffer_[i]);
+  }
+  
+  // Log apenas ocasionalmente para evitar spam
+  size_t transferred = safe_transfer_pos - last_transferred_pos_;
+  static size_t total_transferred = 0;
+  total_transferred += transferred;
+  if (total_transferred % 100 == 0) {
+    LOG_DEBUG("Total transferred: %zu samples", total_transferred);
+  }
+  
+  last_transferred_pos_ = safe_transfer_pos;
+}
+
+void ECGAnalyzer::ApplyClassifications() {
+  // Apply wave type classifications to detected beats
+  for (const auto& beat : detected_beats_) {
+    
+    // Always mark R peak
+    if (beat.r_pos < sample_buffer_.size()) {
+      sample_buffer_[beat.r_pos].classification = WaveType::kR;
+    }
+    
+    // Mark Q and S if QRS is complete
+    if (beat.qrs_complete) {
+      if (beat.q_pos < sample_buffer_.size()) {
+        sample_buffer_[beat.q_pos].classification = WaveType::kQ;
+      }
+      if (beat.s_pos < sample_buffer_.size()) {
+        sample_buffer_[beat.s_pos].classification = WaveType::kS;
+      }
+    }
+    
+    // Mark P if detected
+    if (beat.p_complete && beat.p_pos < sample_buffer_.size()) {
+      sample_buffer_[beat.p_pos].classification = WaveType::kP;
+    }
+    
+    // Mark T if detected
+    if (beat.t_complete && beat.t_pos < sample_buffer_.size()) {
+      sample_buffer_[beat.t_pos].classification = WaveType::kT;
+    }
+  }
+}
+
+void ECGAnalyzer::ProcessFinalData() {
+  LOG_INFO("Processing final data...");
+  
+  // Process any remaining beats that can be completed
+  ProcessCompleteBeats();
+  
+  // Apply final classifications
+  ApplyClassifications();
+  
+  // Transfer all remaining samples
+  for (size_t i = last_transferred_pos_; i < sample_buffer_.size(); i++) {
+    buffer_classified_->AddData(sample_buffer_[i]);
+  }
+  
+  LOG_INFO("Final processing complete. Total beats detected: %zu", detected_beats_.size());
+  
+  #ifdef DEBUG
+  size_t complete_beats = 0;
+  for (const auto& beat : detected_beats_) {
+    if (beat.qrs_complete && beat.p_complete && beat.t_complete) {
+      complete_beats++;
+    }
+  }
+  LOG_DEBUG("Complete P-QRS-T beats: %zu/%zu", complete_beats, detected_beats_.size());
+  #endif
 }
