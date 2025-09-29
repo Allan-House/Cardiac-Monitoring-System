@@ -1,6 +1,7 @@
 #ifndef ECG_ANALYZER_H_
 #define ECG_ANALYZER_H_
 
+#include "config.h"
 #include "ring_buffer.h"
 #include <atomic>
 #include <chrono>
@@ -9,12 +10,12 @@
 #include <vector>
 
 enum class WaveType {
-  kNormal,    // Amostra normal (sem classificação específica)
-  kP,         // Onda P
-  kQ,         // Ponto Q
-  kR,         // Pico R
-  kS,         // Ponto S
-  kT          // Onda T
+  kNormal,
+  kP,
+  kQ,
+  kR,
+  kS,
+  kT
 };
 
 struct Sample {
@@ -31,18 +32,16 @@ struct Sample {
     : voltage(v), timestamp(t), classification(type) {}
 };
 
-// Configuration constants (centralized)
 namespace ecg_config {
-  constexpr uint16_t kSampleRate = 250;  // SPS
-  constexpr float kRThreshold = 2.0f;    // R peak threshold
+  constexpr float kRThreshold = 2.0f;
   
-  // Detection windows (in samples) - exactly from the paper
-  constexpr size_t kQSWindow = kSampleRate * 80 / 1000;   // 80ms = 20 samples
-  constexpr size_t kPWindow = kSampleRate * 200 / 1000;   // 200ms = 50 samples  
-  constexpr size_t kTWindow = kSampleRate * 400 / 1000;   // 400ms = 100 samples
+  // Detection windows (in samples)
+  constexpr size_t kQSWindow {config::kSampleRate * 80 / 1000}; // 80ms
+  constexpr size_t kPWindow {config::kSampleRate * 200 / 1000}; // 200ms
+  constexpr size_t kTWindow {config::kSampleRate * 400 / 1000}; // 400ms
   
   // Refractory period to avoid double detection
-  constexpr size_t kRefractoryPeriod = kSampleRate * 300 / 1000; // 300ms = 75 samples
+  constexpr size_t kRefractoryPeriod {config::kSampleRate * 300 / 1000}; // 300ms
 }
 
 struct Beat {

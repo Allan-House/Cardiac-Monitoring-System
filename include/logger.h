@@ -9,7 +9,7 @@
 #include <atomic>
 #include <chrono>
 
-namespace cardiac_logger {
+namespace logger {
   enum class Level : int {
     kCritical = 0,
     kError    = 1,
@@ -301,14 +301,14 @@ namespace cardiac_logger {
     Logger::instance().log_internal(Level::kDebug, "%s", buffer);
   }
 
-} // namespace cardiac_logger
+} // namespace logger
 
 // Convenience macros
-#define LOG_CRITICAL(...) cardiac_logger::log_kCritical(__VA_ARGS__)
-#define LOG_ERROR(...)    cardiac_logger::log_kError(__VA_ARGS__)
-#define LOG_WARN(...)     cardiac_logger::log_kWarn(__VA_ARGS__)
-#define LOG_SUCCESS(...)  cardiac_logger::log_kSuccess(__VA_ARGS__)
-#define LOG_INFO(...)     cardiac_logger::log_kInfo(__VA_ARGS__)
+#define LOG_CRITICAL(...) logger::log_kCritical(__VA_ARGS__)
+#define LOG_ERROR(...)    logger::log_kError(__VA_ARGS__)
+#define LOG_WARN(...)     logger::log_kWarn(__VA_ARGS__)
+#define LOG_SUCCESS(...)  logger::log_kSuccess(__VA_ARGS__)
+#define LOG_INFO(...)     logger::log_kInfo(__VA_ARGS__)
 
 // Conditional macros for different builds
 #if defined(NDEBUG) || defined(CARDIAC_RELEASE)
@@ -316,7 +316,7 @@ namespace cardiac_logger {
   #define LOG_DEBUG(...) ((void)0)
 #else
   // DEVELOPMENT BUILD: All logs active
-  #define LOG_DEBUG(...) cardiac_logger::log_kDebug(__VA_ARGS__)
+  #define LOG_DEBUG(...) logger::log_kDebug(__VA_ARGS__)
 #endif
 
 #endif

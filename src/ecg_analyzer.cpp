@@ -40,16 +40,15 @@ void ECGAnalyzer::ProcessingLoop() {
   uint32_t sample_count = 0;
   #endif
 
-  // Real-time processing loop
   while (processing_) {
-    auto sample_opt = buffer_raw_->Consume();
+    auto data = buffer_raw_->Consume();
     
-    if (!sample_opt) {
+    if (!data) {
       LOG_INFO("Processing interrupted - buffer shutdown");
       break;
     }
     
-    ProcessSample(sample_opt.value());
+    ProcessSample(data.value());
 
     #ifdef DEBUG
     sample_count++;
@@ -63,10 +62,10 @@ void ECGAnalyzer::ProcessingLoop() {
   LOG_INFO("Processing remaining samples in buffer...");
   
   // Process remaining samples
-  auto sample_opt = buffer_raw_->Consume();
-  while (sample_opt) {
-    ProcessSample(sample_opt.value());
-    sample_opt = buffer_raw_->Consume();
+  auto data = buffer_raw_->Consume();
+  while (data) {
+    ProcessSample(data.value());
+    data = buffer_raw_->Consume();
   }
 
   // Final processing

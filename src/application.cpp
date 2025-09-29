@@ -1,5 +1,6 @@
 #include "ads1115.h"
 #include "application.h"
+#include "config.h"
 #include "ecg_analyzer.h"
 #include "file_manager.h"
 #include "logger.h"
@@ -31,8 +32,8 @@ Application::~Application() {
 
 bool Application::Start() {
   LOG_INFO("Starting application...");
-  LOG_INFO("Sample rate: %d SPS", static_cast<int>(kSampleRate));
-  LOG_INFO("Sample period: %d μs", kPeriodUs);
+  LOG_INFO("Sample rate: %d SPS", static_cast<int>(config::kSampleRate));
+  LOG_INFO("Sample period: %d μs", config::kPeriodUs);
   
   if (!data_source_->Available()) {
     LOG_ERROR("Data source not available");
@@ -107,8 +108,7 @@ void Application::AcquisitionLoop() {
     while (running_.load() && std::chrono::steady_clock::now() < end_time) {
       expected_sample++;
       
-      auto target_time = start_time + (expected_sample * kSamplePeriod);
-      
+      auto target_time = start_time + (expected_sample * config::kSamplePeriod);
       std::this_thread::sleep_until(target_time);
       
       // Check if we should stop
@@ -121,9 +121,8 @@ void Application::AcquisitionLoop() {
 
       #ifdef DEBUG
         sample_count++;
-        if (sample_count % 250 == 0) {
+        if (sample_count % config::kSampleRate == 0) {
           std::cout << "Samples collected: " << sample_count 
-                    << " | Buffer size: " << buffer_raw_->Size()
                     << std::endl;
         }
       #endif
@@ -150,4 +149,8 @@ void Application::AcquisitionLoop() {
   buffer_raw_->Shutdown();
   
   LOG_INFO("Acquisition loop finished, signaled shutdown to processing threads");
+}
+
+void Application::set_acquisition_duration(std::chrono::seconds duration) {
+  acquisition_duration_ = duration;
 }

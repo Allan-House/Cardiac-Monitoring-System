@@ -1,6 +1,7 @@
 #ifndef APPLICATION_H_
 #define APPLICATION_H_
 
+#include "config.h"
 #include "data_source.h"
 #include "ecg_analyzer.h"
 #include "file_manager.h"
@@ -13,12 +14,6 @@
 
 class Application {
   private:
-  // TODO (allan): padronizar ao longo de todo o código.
-  // Timing configurations
-  static constexpr uint16_t kSampleRate{250};  // SPS
-  static constexpr double kPeriodSeconds{1.0 / kSampleRate};  // 0.004 seconds
-  static constexpr auto kPeriodUs{static_cast<int>(kPeriodSeconds * 1000000)};  // 4000 μs
-  static constexpr auto kSamplePeriod{std::chrono::microseconds(kPeriodUs)};
   
   // External dependencies
   std::shared_ptr<DataSource> data_source_;
@@ -56,6 +51,8 @@ class Application {
   // Status
   bool Running() const {return running_.load();}
 
+  void set_acquisition_duration(std::chrono::seconds duration);
+  
   private:
   // Thread functions
   void AcquisitionLoop();
