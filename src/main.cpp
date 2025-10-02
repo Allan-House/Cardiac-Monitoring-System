@@ -14,12 +14,12 @@
 #include "system_monitor.h"
 
 #ifdef USE_HARDWARE_SOURCE
-  #include "ads1115.h"
-  #include "sensor_data.h"
+#include "ads1115.h"
+#include "sensor_data.h"
 #endif
 
 #ifdef USE_FILE_SOURCE
-  #include "file_data.h"
+#include "file_data.h"
 #endif
 
 std::shared_ptr<DataSource> createDataSource(int argc, char** argv);
@@ -127,11 +127,11 @@ bool parse_arguments(int argc, char** argv,
     }
     
     #ifdef USE_FILE_SOURCE
-      // File argument (only for file source builds)
-      if (arg[0] != '-') {
-        data_file = arg;
-        continue;
-      }
+    // File argument (only for file source builds)
+    if (arg[0] != '-') {
+      data_file = arg;
+      continue;
+    }
     #endif
     
     // Unknown argument

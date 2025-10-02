@@ -9,6 +9,18 @@
 #include <thread>
 #include <vector>
 
+namespace ecg_config {
+  constexpr float kRThreshold = 2.5f;
+  
+  // Detection windows (in samples)
+  constexpr size_t kQSWindow {config::kSampleRate * 80 / 1000}; // 80ms
+  constexpr size_t kPWindow {config::kSampleRate * 200 / 1000}; // 200ms
+  constexpr size_t kTWindow {config::kSampleRate * 400 / 1000}; // 400ms
+  
+  // Refractory period to avoid double detection
+  constexpr size_t kRefractoryPeriod {config::kSampleRate * 300 / 1000}; // 300ms
+}
+
 enum class WaveType {
   kNormal,
   kP,
@@ -32,18 +44,6 @@ struct Sample {
     : voltage(v), timestamp(t), classification(type) {}
 };
 
-namespace ecg_config {
-  constexpr float kRThreshold = 2.0f;
-  
-  // Detection windows (in samples)
-  constexpr size_t kQSWindow {config::kSampleRate * 80 / 1000}; // 80ms
-  constexpr size_t kPWindow {config::kSampleRate * 200 / 1000}; // 200ms
-  constexpr size_t kTWindow {config::kSampleRate * 400 / 1000}; // 400ms
-  
-  // Refractory period to avoid double detection
-  constexpr size_t kRefractoryPeriod {config::kSampleRate * 300 / 1000}; // 300ms
-}
-
 struct Beat {
   size_t r_pos;
   size_t q_pos = 0;
@@ -60,7 +60,7 @@ struct Beat {
 class ECGAnalyzer {
   private:
   // Buffers
-  std::vector<Sample> sample_buffer_;
+  std::vector<Sample> samples_;
   std::vector<Beat> detected_beats_;
   std::shared_ptr<RingBuffer<Sample>> buffer_raw_;
   std::shared_ptr<RingBuffer<Sample>> buffer_classified_;
@@ -70,7 +70,7 @@ class ECGAnalyzer {
   std::thread processing_thread_;
   
   // State tracking
-  size_t last_transferred_pos_ = 0;
+  size_t last_transferred_pos_ {0};
 
   public:
   ECGAnalyzer(std::shared_ptr<RingBuffer<Sample>> buffer_raw,

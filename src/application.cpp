@@ -120,11 +120,11 @@ void Application::AcquisitionLoop() {
       buffer_raw_->AddData(sample);
 
       #ifdef DEBUG
-        sample_count++;
-        if (sample_count % config::kSampleRate == 0) {
-          std::cout << "Samples collected: " << sample_count 
-                    << std::endl;
-        }
+      sample_count++;
+      if (sample_count % config::kSampleRate == 0) {
+        std::cout << "Samples collected: " << sample_count 
+                  << std::endl;
+      }
       #endif
       
       // Auto-correction: if too late, skip a sample

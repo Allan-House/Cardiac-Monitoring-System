@@ -1,6 +1,7 @@
 #ifndef ADS_1115_H_
 #define ADS_1115_H_
 
+#include "config.h"
 #include <cstdint>
 #include <iostream>
 #include <wiringPi.h>
@@ -69,6 +70,17 @@ namespace ads1115_constants {
     kTraditional = 0x0000,
     kWindow      = 0x0010
   };
+
+  constexpr DataRate GetConfigDataRate() {
+    return (config::kSampleRate == 8)   ? DataRate::kSPS_8 :
+           (config::kSampleRate == 16)  ? DataRate::kSPS_16 :
+           (config::kSampleRate == 32)  ? DataRate::kSPS_32 :
+           (config::kSampleRate == 64)  ? DataRate::kSPS_64 :
+           (config::kSampleRate == 128) ? DataRate::kSPS_128 :
+           (config::kSampleRate == 250) ? DataRate::kSPS_250 :
+           (config::kSampleRate == 475) ? DataRate::kSPS_475 :
+                                          DataRate::kSPS_860;    
+  }
 }
 
 /**

@@ -7,7 +7,7 @@ ADS1115::ADS1115(uint8_t address) :
 config_register_ {static_cast<uint16_t>(ads1115_constants::Mux::kA0_GND)       |
                   static_cast<uint16_t>(ads1115_constants::Gain::kFSR_4_096V)  | 
                   static_cast<uint16_t>(ads1115_constants::Mode::kContinuous)  |
-                  static_cast<uint16_t>(ads1115_constants::DataRate::kSPS_250) |
+                  static_cast<uint16_t>(ads1115_constants::GetConfigDataRate())|
                   0x0003},
 i2c_address_ {address},
 i2c_fd_ {-1},
