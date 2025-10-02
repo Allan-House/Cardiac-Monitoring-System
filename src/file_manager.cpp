@@ -17,6 +17,7 @@ std::string WaveTypeToString(WaveType type) {
   }
 }
 
+
 FileManager::FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
                         const std::string& base_filename,
                         std::chrono::milliseconds write_interval)
@@ -30,10 +31,12 @@ FileManager::FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
   csv_filename_ = "data/processed/" + base_filename + "_" + timestamp + ".csv";
 }
 
+
 void FileManager::CreateDirectories() {
   std::filesystem::create_directories("data/processed");
   std::filesystem::create_directories("data/raw");
 }
+
 
 std::string FileManager::GenerateTimestamp() {
   auto now = std::chrono::system_clock::now();
@@ -43,6 +46,7 @@ std::string FileManager::GenerateTimestamp() {
   ss << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S");
   return ss.str();
 }
+
 
 bool FileManager::Init() {
   LOG_INFO("Initializing FileManager with files: %s %s",
@@ -71,10 +75,12 @@ bool FileManager::Init() {
   return true;
 }
 
+
 void FileManager::Run() {
   writing_ = true;
   writing_thread_ = std::thread(&FileManager::WritingLoop, this);
 }
+
 
 void FileManager::WritingLoop() {
   auto next_write_time {std::chrono::steady_clock::now()};
@@ -97,6 +103,7 @@ void FileManager::WritingLoop() {
   LOG_INFO("File writing thread finished.");
 }
 
+
 void FileManager::Stop() {
   LOG_INFO("Stopping file writing...");
   writing_ = false;
@@ -108,12 +115,14 @@ void FileManager::Stop() {
   Close();
 }
 
+
 void FileManager::Close() {
   if (csv_stream_ && csv_stream_->is_open()) {csv_stream_->close();}
   if (bin_stream_ && bin_stream_->is_open()) {bin_stream_->close();}
   LOG_INFO("File closed. Total samples: %zu, Total bytes: %zu", 
             samples_written_, total_bytes_written_);
 }
+
 
 void FileManager::WriteCSVHeader() {
   if (csv_stream_ && csv_stream_->is_open()) {
@@ -123,6 +132,7 @@ void FileManager::WriteCSVHeader() {
     LOG_ERROR("Cannot write CSV header - file stream not open");
   }
 }
+
 
 void FileManager::WriteAvailableData() {
   if ((!csv_stream_ || !csv_stream_->is_open()) &&
@@ -149,6 +159,7 @@ void FileManager::WriteAvailableData() {
     if (bin_stream_ && bin_stream_->is_open()) bin_stream_->flush();
   }
 }
+
 
 void FileManager::WriteSample(const Sample& sample) {
   auto duration = sample.timestamp.time_since_epoch();
@@ -188,6 +199,7 @@ void FileManager::WriteSample(const Sample& sample) {
     total_bytes_written_ += line.length();
   }
 }
+
 
 void FileManager::FlushRemainingData() {
   Sample sample;

@@ -24,11 +24,13 @@ FileData::FileData(const std::string& filename, float voltage_range, bool loop)
   LOG_SUCCESS("Loaded %zu samples from %s", samples_.size(), filename.c_str());
 }
 
+
 FileData::~FileData() {
   if (file_stream_.is_open()) {
     file_stream_.close();
   }
 }
+
 
 bool FileData::LoadSamples(const std::string& filename) {
   file_stream_.open(filename, std::ios::binary);
@@ -59,13 +61,16 @@ bool FileData::LoadSamples(const std::string& filename) {
   return !samples_.empty();
 }
 
+
 float FileData::ConvertToVoltage(int16_t raw_value) const {
   return (raw_value * voltage_range_) / 32768.0f;
 }
 
+
 bool FileData::Initialized() const {
   return initialized_;
 }
+
 
 float FileData::ReadVoltage() {
   // TODO (allan): padronizar erro de leitura.
@@ -87,6 +92,7 @@ float FileData::ReadVoltage() {
   return voltage;
 }
 
+
 bool FileData::Available() const {
   if (!initialized_) {
     return false;
@@ -99,9 +105,11 @@ bool FileData::Available() const {
   return current_index_ < samples_.size();
 }
 
+
 void FileData::Reset() {
   current_index_ = 0;
 }
+
 
 bool FileData::End() const {
   return current_index_ >= samples_.size();

@@ -15,20 +15,24 @@ Application::Application(std::shared_ptr<DataSource> data_source,
                          std::shared_ptr<RingBuffer<Sample>> buffer_classified,
                          std::shared_ptr<ECGAnalyzer> ecg_analyzer,
                          std::shared_ptr<FileManager> file_manager,
-                         std::shared_ptr<SystemMonitor> system_monitor)
+                         std::shared_ptr<SystemMonitor> system_monitor,
+                         std::shared_ptr<TCPFileServer> tcp_server)
   : data_source_ {data_source},
     buffer_raw_ {buffer_raw},
     buffer_classified_ {buffer_classified},
     ecg_analyzer_ {ecg_analyzer},
     file_manager_ {file_manager},
-    system_monitor_ {system_monitor}
+    system_monitor_ {system_monitor},
+    tcp_server_ {tcp_server}
 {
   // Empty constructor
 }
 
+
 Application::~Application() {
   Stop();
 }
+
 
 bool Application::Start() {
   LOG_INFO("Starting application...");
@@ -50,6 +54,7 @@ bool Application::Start() {
   running_ = true;
   return true;
 }
+
 
 // TODO (allan): adicionar callback de controle:
 //               - Verificação de sinais (CTRL+C)
@@ -80,7 +85,8 @@ void Application::Run() {
 
   LOG_SUCCESS("All threads stopped successfully");
 }
-  
+
+
 void Application::Stop() {
   if (running_) {
     LOG_INFO("Stopping application...");
@@ -91,6 +97,25 @@ void Application::Stop() {
     LOG_SUCCESS("Application stopped");
   }
 }
+
+void Application::StartTCPServer() {
+  if (!tcp_server_) {
+    LOG_INFO("TCP Server not available on this platform");
+    return;
+  }
+
+  LOG_INFO("Starting TCP File Server...");
+
+  if (!tcp_server_->Init()) {
+    LOG_ERROR("Failed to initialize TCP server.");
+    return;
+  }
+
+  tcp_server_->Start();
+
+  tcp_server_->WaitForCompletion();
+}
+
 
 void Application::AcquisitionLoop() {
   LOG_INFO("Starting acquisition for %ld seconds.", acquisition_duration_.count());
@@ -150,6 +175,7 @@ void Application::AcquisitionLoop() {
   
   LOG_INFO("Acquisition loop finished, signaled shutdown to processing threads");
 }
+
 
 void Application::set_acquisition_duration(std::chrono::seconds duration) {
   acquisition_duration_ = duration;

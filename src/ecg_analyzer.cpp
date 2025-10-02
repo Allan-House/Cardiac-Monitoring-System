@@ -11,14 +11,16 @@ ECGAnalyzer::ECGAnalyzer(std::shared_ptr<RingBuffer<Sample>> buffer_raw,
     buffer_classified_ {buffer_classified}
 {
   // Reserve space to avoid reallocations during execution
-  samples_.reserve(20000); // ~80 seconds at 250Hz
+  samples_.reserve(20000); // ~80 seconds at 250Hz // TODO (allan): relacionar com config.h
   detected_beats_.reserve(200);   // ~200 beats max
 }
+
 
 void ECGAnalyzer::Run() {
   processing_ = true;
   processing_thread_ = std::thread(&ECGAnalyzer::ProcessingLoop, this);
 }
+
 
 void ECGAnalyzer::Stop() {
   LOG_INFO("Stopping ECG processing thread...");
@@ -32,6 +34,7 @@ void ECGAnalyzer::Stop() {
 
   LOG_INFO("ECG processing stopped");
 }
+
 
 void ECGAnalyzer::ProcessingLoop() {
   LOG_INFO("Starting ECG processing thread...");
@@ -75,6 +78,7 @@ void ECGAnalyzer::ProcessingLoop() {
   LOG_INFO("Processing thread finished.");
 }
 
+
 void ECGAnalyzer::ProcessSample(const Sample& sample) {
   samples_.push_back(sample);
   
@@ -87,6 +91,7 @@ void ECGAnalyzer::ProcessSample(const Sample& sample) {
   TransferProcessedSamples();
 }
 
+
 void ECGAnalyzer::DetectRPeaks() {
   // Check the sample before current (1 sample delay for reliable peak detection)
   size_t check_position {samples_.size() - 2};
@@ -96,6 +101,7 @@ void ECGAnalyzer::DetectRPeaks() {
     LOG_DEBUG("R peak detected at position %zu", check_position);
   }
 }
+
 
 bool ECGAnalyzer::IsRPeak(size_t pos) const {
   if (pos == 0 || pos >= samples_.size() - 1) {
@@ -121,6 +127,7 @@ bool ECGAnalyzer::IsRPeak(size_t pos) const {
   
   return is_peak;
 }
+
 
 void ECGAnalyzer::ProcessCompleteBeats() {
   for (auto& beat : detected_beats_) {
@@ -157,18 +164,22 @@ void ECGAnalyzer::ProcessCompleteBeats() {
   }
 }
 
+
 bool ECGAnalyzer::CanCompleteQRS(size_t r_pos) const {
   return (r_pos >= ecg_config::kQSWindow) && 
          (r_pos + ecg_config::kQSWindow < samples_.size());
 }
 
+
 bool ECGAnalyzer::CanCompleteP(size_t q_pos) const {
   return q_pos >= ecg_config::kPWindow;
 }
 
+
 bool ECGAnalyzer::CanCompleteT(size_t s_pos) const {
   return s_pos + ecg_config::kTWindow < samples_.size();
 }
+
 
 size_t ECGAnalyzer::FindLowest(size_t start, size_t end) const {
   if (start >= samples_.size() || end >= samples_.size() || start >= end) {
@@ -188,6 +199,7 @@ size_t ECGAnalyzer::FindLowest(size_t start, size_t end) const {
   return lowest_idx;
 }
 
+
 size_t ECGAnalyzer::FindHighest(size_t start, size_t end) const {
   if (start >= samples_.size() || end >= samples_.size() || start >= end) {
     return start;
@@ -205,6 +217,7 @@ size_t ECGAnalyzer::FindHighest(size_t start, size_t end) const {
   
   return highest_idx;
 }
+
 
 void ECGAnalyzer::TransferProcessedSamples() {
   if (samples_.size() <= ecg_config::kTWindow) {
@@ -234,6 +247,7 @@ void ECGAnalyzer::TransferProcessedSamples() {
   
   last_transferred_pos_ = safe_transfer_pos;
 }
+
 
 void ECGAnalyzer::ApplyClassifications() {
   // Apply wave type classifications to detected beats
@@ -266,6 +280,7 @@ void ECGAnalyzer::ApplyClassifications() {
   }
 }
 
+
 void ECGAnalyzer::ProcessFinalData() {
   LOG_INFO("Processing final data...");
   
@@ -280,7 +295,8 @@ void ECGAnalyzer::ProcessFinalData() {
     buffer_classified_->AddData(samples_.at(i));
   }
   
-  LOG_INFO("Final processing complete. Total beats detected: %zu", detected_beats_.size());
+  LOG_INFO("Final processing complete. Total beats detected: %zu",
+           detected_beats_.size());
   
   #ifdef DEBUG
   size_t complete_beats = 0;
@@ -289,6 +305,7 @@ void ECGAnalyzer::ProcessFinalData() {
       complete_beats++;
     }
   }
-  LOG_DEBUG("Complete P-QRS-T beats: %zu/%zu", complete_beats, detected_beats_.size());
+  LOG_DEBUG("Complete P-QRS-T beats: %zu/%zu",
+            complete_beats, detected_beats_.size());
   #endif
 }

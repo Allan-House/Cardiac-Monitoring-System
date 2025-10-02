@@ -38,6 +38,7 @@ set(SOURCES
   src/application.cpp
   src/ecg_analyzer.cpp
   src/file_manager.cpp
+  src/tcp_file_server.cpp
 )
 
 # Add platform-specific sources

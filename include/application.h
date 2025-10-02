@@ -7,6 +7,7 @@
 #include "file_manager.h"
 #include "ring_buffer.h"
 #include "system_monitor.h"
+#include "tcp_file_server.h"
 #include <atomic>
 #include <condition_variable>
 #include <memory>
@@ -16,12 +17,14 @@ class Application {
   private:
   
   // External dependencies
+  // TODO (allan): decidir quais devem ser unique_ptr e quais devem ser shared_ptr 
   std::shared_ptr<DataSource> data_source_;
   std::shared_ptr<RingBuffer<Sample>> buffer_raw_;
   std::shared_ptr<RingBuffer<Sample>> buffer_classified_;
   std::shared_ptr<ECGAnalyzer> ecg_analyzer_;
   std::shared_ptr<FileManager> file_manager_;
   std::shared_ptr<SystemMonitor> system_monitor_;
+  std::shared_ptr<TCPFileServer> tcp_server_;
 
   // Thread management
   std::thread acquisition_thread_;
@@ -38,7 +41,8 @@ class Application {
               std::shared_ptr<RingBuffer<Sample>> buffer_classified,
               std::shared_ptr<ECGAnalyzer> ecg_analyzer,
               std::shared_ptr<FileManager> file_manager,
-              std::shared_ptr<SystemMonitor> system_monitor);
+              std::shared_ptr<SystemMonitor> system_monitor,
+              std::shared_ptr<TCPFileServer> tcp_server);
   Application(const Application&) = delete;
   Application& operator=(const Application&) = delete;
   ~Application();
@@ -47,6 +51,7 @@ class Application {
   bool Start();
   void Run();
   void Stop();
+  void StartTCPServer();
 
   // Status
   bool Running() const {return running_.load();}

@@ -12,6 +12,7 @@
 #include "logger.h"
 #include "ring_buffer.h"
 #include "system_monitor.h"
+#include "tcp_file_server.h"
 
 #ifdef USE_HARDWARE_SOURCE
 #include "ads1115.h"
@@ -59,13 +60,19 @@ int main(int argc, char** argv) {
     config::kFileWriteInterval
   );
   auto system_monitor = std::make_shared<SystemMonitor>();
-  
+  std::shared_ptr<TCPFileServer> tcp_server;
+
+  #ifdef USE_HARDWARE_SOURCE
+  tcp_server = std::make_shared<TCPFileServer>();
+  #endif
+
   Application application{data_source,
                           buffer_raw,
                           buffer_classified,
                           ecg_analyzer,
                           file_manager,
-                          system_monitor};
+                          system_monitor,
+                          tcp_server};
 
   application.set_acquisition_duration(acquisition_duration);
 
@@ -75,8 +82,11 @@ int main(int argc, char** argv) {
   }
    
   application.Run();
+  application.StartTCPServer(); // TODO (allan): mover a chamada para dentro de Application?
 
   LOG_SUCCESS("Application completed successfully");
+
+
   logger::shutdown();
   return 0;
 }
@@ -144,7 +154,8 @@ bool parse_arguments(int argc, char** argv,
 }
 
 std::shared_ptr<DataSource> createDataSource(int argc, char** argv) {
-#ifdef USE_HARDWARE_SOURCE
+#ifdef USE_HARD
+RE_SOURCE
   std::cout << "Using hardware data source (Raspberry Pi)" << std::endl;
   auto ads1115 = std::make_shared<ADS1115>();
   return std::make_shared<SensorData>(ads1115);
