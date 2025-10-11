@@ -7,16 +7,13 @@
 #include <string>
 #include <vector>
 #include <thread>
+#include <mutex>
 
 
 /**
 * @brief Simple TCP server for file transfer
 *
-* Listens on a specified port and handles client requests to:
-* - LIST: Get list of available files
-* - GET <filename>: Download specific file
-* - GET_LATEST: Download most recent file (by timestamp)
-*
+* Accepts connections and automatically sends files when ready.
 * Thread-safe and supports sequential client connections.
 */
 class TCPFileServer {
@@ -27,8 +24,13 @@ class TCPFileServer {
  
   // Server state
   int server_socket_;
+  int client_socket_;
   std::atomic<bool> running_;
   std::thread server_thread_;
+ 
+  // Client connection state
+  mutable std::mutex client_mutex_;
+  std::atomic<bool> files_ready_{false};
  
   // Statistics
   std::atomic<size_t> connections_handled_;
@@ -53,22 +55,29 @@ class TCPFileServer {
    * @return true if successful, false otherwise
    */
   bool Init();
- 
+
   /**
    * @brief Starts server thread to accept connections
    */
-  void Start();
+  void Run();
  
   /**
    * @brief Stops server and closes all connections
    */
   void Stop();
- 
+
   /**
-   * @brief Blocks until server thread finishes
+   * @brief Checks if a client is currently connected
+   * @return true if client connected, false otherwise
    */
-  void WaitForCompletion();
- 
+  bool HasConnectedClient() const;
+
+  /**
+   * @brief Sends all available files to connected client
+   * Does nothing if no client is connected
+   */
+  void SendAvailableFiles();
+   
   // Statistics
   bool is_running() const {return running_.load();}
   size_t get_connections_handled() const {return connections_handled_.load();}
@@ -81,41 +90,10 @@ class TCPFileServer {
   void ServerLoop();
  
   /**
-   * @brief Handles a single client connection
-   * @param client_socket Socket descriptor for connected client
-   */
-  void HandleClient(int client_socket);
- 
-  /**
-   * @brief Processes LIST command
-   * @param client_socket Socket to send response
-   */
-  void HandleListCommand(int client_socket);
- 
-  /**
-   * @brief Processes GET command
-   * @param client_socket Socket to send file data
-   * @param filename Name of file to send
-   */
-  void HandleGetCommand(int client_socket, const std::string& filename);
- 
-  /**
-   * @brief Processes GET_LATEST command
-   * @param client_socket Socket to send file data
-   */
-  void HandleGetLatestCommand(int client_socket);
- 
-  /**
    * @brief Gets list of files in data directory
    * @return Vector of filenames
    */
   std::vector<std::string> GetAvailableFiles() const;
- 
-  /**
-   * @brief Finds most recent file by timestamp in filename
-   * @return Filename of most recent file, or empty string if none found
-   */
-  std::string FindLatestFile() const;
  
   /**
    * @brief Sends file contents over socket
@@ -132,6 +110,5 @@ class TCPFileServer {
    */
   void SendError(int client_socket, const std::string& error_message);
 };
-
 
 #endif

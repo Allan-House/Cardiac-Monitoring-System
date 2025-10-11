@@ -38,7 +38,6 @@ set(SOURCES
   src/application.cpp
   src/ecg_analyzer.cpp
   src/file_manager.cpp
-  src/tcp_file_server.cpp
 )
 
 # Add platform-specific sources
@@ -46,6 +45,7 @@ if(CMAKE_CROSSCOMPILING)
   list(APPEND SOURCES
     src/ads1115.cpp
     src/sensor_data.cpp
+    src/tcp_file_server.cpp
   )
 else()
   list(APPEND SOURCES

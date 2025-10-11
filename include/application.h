@@ -51,7 +51,6 @@ class Application {
   bool Start();
   void Run();
   void Stop();
-  void StartTCPServer();
 
   // Status
   bool Running() const {return running_.load();}

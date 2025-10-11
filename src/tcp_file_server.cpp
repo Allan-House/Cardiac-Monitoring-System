@@ -14,6 +14,7 @@ TCPFileServer::TCPFileServer(uint16_t port, const std::string& data_directory)
   : port_ {port},
     data_directory_ {data_directory},
     server_socket_ {-1},
+    client_socket_ {-1},
     running_ {false},
     connections_handled_ {0},
     bytes_transferred_ {0}
@@ -78,7 +79,7 @@ bool TCPFileServer::Init() {
 }
 
 
-void TCPFileServer::Start() {
+void TCPFileServer::Run() {
   if (running_.load()) {
     LOG_WARN("Server already running");
     return;
@@ -98,6 +99,16 @@ void TCPFileServer::Stop() {
   LOG_INFO("Stopping TCP Server...");
   running_ = false;
  
+  // Close client socket if connected
+  {
+    std::lock_guard<std::mutex> lock(client_mutex_);
+    if (client_socket_ >= 0) {
+      shutdown(client_socket_, SHUT_RDWR);
+      close(client_socket_);
+      client_socket_ = -1;
+    }
+  }
+ 
   // Close server socket to unblock accept()
   if (server_socket_ >= 0) {
     shutdown(server_socket_, SHUT_RDWR);
@@ -114,135 +125,122 @@ void TCPFileServer::Stop() {
 }
 
 
-void TCPFileServer::WaitForCompletion() {
-  if (server_thread_.joinable()) {
-    server_thread_.join();
-  }
-}
-
-
 void TCPFileServer::ServerLoop() {
   LOG_INFO("Server listening for connections...");
+  
+  // Set accept timeout to allow periodic check of running_ flag
+  struct timeval timeout;
+  timeout.tv_sec = 1;   // 1 second timeout
+  timeout.tv_usec = 0;
+  
+  if (setsockopt(server_socket_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+    LOG_WARN("Failed to set socket timeout: %s", strerror(errno));
+  }
  
   while (running_.load()) {
     struct sockaddr_in client_address;
     socklen_t client_len = sizeof(client_address);
    
-    int client_socket = accept(server_socket_,
-                               (struct sockaddr*)&client_address,
-                               &client_len);
+    int new_client_socket = accept(server_socket_,
+                                    (struct sockaddr*)&client_address,
+                                    &client_len);
    
-    if (client_socket < 0) {
+    if (new_client_socket < 0) {
+      if (errno == EWOULDBLOCK || errno == EAGAIN) {
+        // Timeout - normal, continue loop
+        continue;
+      }
       if (running_.load()) {
         LOG_ERROR("Failed to accept connection: %s", strerror(errno));
       }
       break;
     }
    
+    // Client connected
     char client_ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &client_address.sin_addr, client_ip, INET_ADDRSTRLEN);
     LOG_INFO("Client connected from %s:%d", client_ip, ntohs(client_address.sin_port));
-   
-    HandleClient(client_socket);
-   
-    close(client_socket);
+    
+    // Store client socket
+    {
+      std::lock_guard<std::mutex> lock(client_mutex_);
+      
+      // Close previous client if any
+      if (client_socket_ >= 0) {
+        LOG_WARN("New client connected, closing previous connection");
+        close(client_socket_);
+      }
+      
+      client_socket_ = new_client_socket;
+    }
+    
     connections_handled_++;
+    
+    // If files are already ready, send immediately
+    if (files_ready_.load()) {
+      SendAvailableFiles();
+    }
   }
  
   LOG_INFO("Server loop exited");
 }
 
 
-void TCPFileServer::HandleClient(int client_socket) {
-  char buffer[256];
-  std::memset(buffer, 0, sizeof(buffer));
- 
-  // Read command from client
-  ssize_t bytes_read = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
-  if (bytes_read <= 0) {
-    LOG_WARN("Failed to read from client or client disconnected");
-    return;
-  }
- 
-  buffer[bytes_read] = '\0';
-  std::string command(buffer);
- 
-  // Remove trailing newline/whitespace
-  command.erase(command.find_last_not_of(" \n\r\t") + 1);
- 
-  LOG_INFO("Received command: %s", command.c_str());
- 
-  if (command == "LIST") {
-    HandleListCommand(client_socket);
-  }
-  else if (command == "GET_LATEST") {
-    HandleGetLatestCommand(client_socket);
-  }
-  else if (command.substr(0, 4) == "GET ") {
-    std::string filename = command.substr(4);
-    HandleGetCommand(client_socket, filename);
-  }
-  else {
-    SendError(client_socket, "ERROR: Unknown command. Use LIST, GET <filename>, or GET_LATEST");
-  }
+bool TCPFileServer::HasConnectedClient() const {
+  std::lock_guard<std::mutex> lock(client_mutex_);
+  return client_socket_ >= 0;
 }
 
 
-void TCPFileServer::HandleListCommand(int client_socket) {
+void TCPFileServer::SendAvailableFiles() {
+  std::lock_guard<std::mutex> lock(client_mutex_);
+  
+  files_ready_ = true;
+  
+  if (client_socket_ < 0) {
+    LOG_INFO("No client connected - files will not be sent");
+    return;
+  }
+  
+  LOG_INFO("Sending files to connected client...");
+  
   auto files = GetAvailableFiles();
- 
+  
   if (files.empty()) {
-    SendError(client_socket, "ERROR: No files available");
+    SendError(client_socket_, "ERROR: No files available");
+    LOG_WARN("No files available to send");
     return;
   }
- 
-  std::ostringstream response;
-  response << "OK " << files.size() << "\n";
-  for (const auto& file : files) {
-    response << file << "\n";
-  }
- 
-  std::string response_str = response.str();
-  send(client_socket, response_str.c_str(), response_str.length(), 0);
- 
-  LOG_INFO("Sent file list: %zu files", files.size());
-}
-
-
-void TCPFileServer::HandleGetCommand(int client_socket, const std::string& filename) {
-  // Sanitize filename (prevent directory traversal)
-  if (filename.find("..") != std::string::npos || filename.find("/") != std::string::npos) {
-    SendError(client_socket, "ERROR: Invalid filename");
+  
+  // Send file count
+  std::ostringstream header;
+  header << "FILES " << files.size() << "\n";
+  std::string header_str = header.str();
+  
+  if (send(client_socket_, header_str.c_str(), header_str.length(), 0) < 0) {
+    LOG_ERROR("Failed to send file count: %s", strerror(errno));
+    close(client_socket_);
+    client_socket_ = -1;
     return;
   }
- 
-  std::string filepath = data_directory_ + "/" + filename;
- 
-  if (!std::filesystem::exists(filepath)) {
-    SendError(client_socket, "ERROR: File not found");
-    LOG_WARN("Client requested non-existent file: %s", filename.c_str());
-    return;
+  
+  // Send each file
+  for (const auto& filename : files) {
+    std::string filepath = data_directory_ + "/" + filename;
+    
+    if (!SendFile(client_socket_, filepath)) {
+      LOG_ERROR("Failed to send file: %s", filename.c_str());
+      close(client_socket_);
+      client_socket_ = -1;
+      return;
+    }
   }
- 
-  if (!SendFile(client_socket, filepath)) {
-    SendError(client_socket, "ERROR: Failed to send file");
-  }
-}
-
-
-void TCPFileServer::HandleGetLatestCommand(int client_socket) {
-  std::string latest_file = FindLatestFile();
- 
-  if (latest_file.empty()) {
-    SendError(client_socket, "ERROR: No files available");
-    return;
-  }
- 
-  std::string filepath = data_directory_ + "/" + latest_file;
- 
-  if (!SendFile(client_socket, filepath)) {
-    SendError(client_socket, "ERROR: Failed to send file");
-  }
+  
+  LOG_SUCCESS("All files sent successfully");
+  
+  // Close connection after sending
+  close(client_socket_);
+  client_socket_ = -1;
 }
 
 
@@ -264,19 +262,6 @@ std::vector<std::string> TCPFileServer::GetAvailableFiles() const {
 }
 
 
-std::string TCPFileServer::FindLatestFile() const {
-  auto files = GetAvailableFiles();
- 
-  if (files.empty()) {
-    return "";
-  }
- 
-  // Files are named with timestamp: cardiac_data_YYYYMMDD_HHMMSS.ext
-  // Sorting alphabetically gives us chronological order
-  // Return last one (most recent)
-  return files.back();
-}
-
 bool TCPFileServer::SendFile(int client_socket, const std::string& filepath) {
   std::ifstream file(filepath, std::ios::binary | std::ios::ate);
  
@@ -288,15 +273,21 @@ bool TCPFileServer::SendFile(int client_socket, const std::string& filepath) {
   // Get file size
   std::streamsize file_size = file.tellg();
   file.seekg(0, std::ios::beg);
+  
+  // Get filename without path
+  std::string filename = std::filesystem::path(filepath).filename().string();
  
-  // Send OK response with file size
-  std::ostringstream header;
-  header << "OK " << file_size << "\n";
-  std::string header_str = header.str();
-  send(client_socket, header_str.c_str(), header_str.length(), 0);
+  // Send file metadata: "FILE <filename> <size>\n"
+  std::ostringstream metadata;
+  metadata << "FILE " << filename << " " << file_size << "\n";
+  std::string metadata_str = metadata.str();
+  
+  if (send(client_socket, metadata_str.c_str(), metadata_str.length(), 0) < 0) {
+    LOG_ERROR("Failed to send file metadata: %s", strerror(errno));
+    return false;
+  }
  
-  LOG_INFO("Sending file: %s (%ld bytes)",
-           std::filesystem::path(filepath).filename().c_str(), file_size);
+  LOG_INFO("Sending file: %s (%ld bytes)", filename.c_str(), file_size);
  
   // Send file data in chunks
   const size_t chunk_size = 8192;
@@ -317,7 +308,7 @@ bool TCPFileServer::SendFile(int client_socket, const std::string& filepath) {
  
   bytes_transferred_ += total_sent;
  
-  LOG_SUCCESS("File sent successfully: %zu bytes", total_sent);
+  LOG_SUCCESS("File sent successfully: %s (%zu bytes)", filename.c_str(), total_sent);
   return true;
 }
 

@@ -48,6 +48,13 @@ bool Application::Start() {
     return false;
   }
 
+  #ifdef USE_HARDWARE_SOURCE
+  if (tcp_server_ && !tcp_server_->Init()) {
+    LOG_ERROR("Failed to initialize TCP server");
+    return false;
+  }
+  #endif
+
   LOG_SUCCESS("All components initialized successfully");
 
   // TODO (allan): definir running_ aqui?
@@ -70,9 +77,15 @@ void Application::Run() {
   acquisition_thread_ = std::thread(&Application::AcquisitionLoop, this);
   ecg_analyzer_->Run();
   file_manager_->Run();
-  // system_monitor_->Run();
+
+  #ifdef USE_HARDWARE_SOURCE
+  if (tcp_server_) {
+    tcp_server_->Run();
+  }
+  #endif
 
   LOG_INFO("Waiting for acquisition to complete...");
+
   if (acquisition_thread_.joinable()) {
     acquisition_thread_.join();
   }
@@ -81,7 +94,13 @@ void Application::Run() {
 
   ecg_analyzer_->Stop();
   file_manager_->Stop();
-  // system_monitor_->Stop();
+  #ifdef USE_HARDWARE_SOURCE
+  if (tcp_server_) {
+    LOG_INFO("Sending files to connected client (if any)...");
+    tcp_server_->SendAvailableFiles();
+    tcp_server_->Stop();
+  }
+  #endif
 
   LOG_SUCCESS("All threads stopped successfully");
 }
@@ -96,24 +115,6 @@ void Application::Stop() {
     
     LOG_SUCCESS("Application stopped");
   }
-}
-
-void Application::StartTCPServer() {
-  if (!tcp_server_) {
-    LOG_INFO("TCP Server not available on this platform");
-    return;
-  }
-
-  LOG_INFO("Starting TCP File Server...");
-
-  if (!tcp_server_->Init()) {
-    LOG_ERROR("Failed to initialize TCP server.");
-    return;
-  }
-
-  tcp_server_->Start();
-
-  tcp_server_->WaitForCompletion();
 }
 
 

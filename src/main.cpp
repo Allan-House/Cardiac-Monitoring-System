@@ -66,13 +66,15 @@ int main(int argc, char** argv) {
   tcp_server = std::make_shared<TCPFileServer>();
   #endif
 
-  Application application{data_source,
-                          buffer_raw,
-                          buffer_classified,
-                          ecg_analyzer,
-                          file_manager,
-                          system_monitor,
-                          tcp_server};
+  Application application{
+    data_source,
+    buffer_raw,
+    buffer_classified,
+    ecg_analyzer,
+    file_manager,
+    system_monitor,
+    tcp_server
+  };
 
   application.set_acquisition_duration(acquisition_duration);
 
@@ -82,7 +84,6 @@ int main(int argc, char** argv) {
   }
    
   application.Run();
-  application.StartTCPServer(); // TODO (allan): mover a chamada para dentro de Application?
 
   LOG_SUCCESS("Application completed successfully");
 
@@ -154,8 +155,7 @@ bool parse_arguments(int argc, char** argv,
 }
 
 std::shared_ptr<DataSource> createDataSource(int argc, char** argv) {
-#ifdef USE_HARD
-RE_SOURCE
+#ifdef USE_HARDWARE_SOURCE
   std::cout << "Using hardware data source (Raspberry Pi)" << std::endl;
   auto ads1115 = std::make_shared<ADS1115>();
   return std::make_shared<SensorData>(ads1115);
