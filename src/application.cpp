@@ -13,17 +13,17 @@
 Application::Application(std::shared_ptr<DataSource> data_source,
                          std::shared_ptr<RingBuffer<Sample>> buffer_raw,
                          std::shared_ptr<RingBuffer<Sample>> buffer_classified,
-                         std::shared_ptr<ECGAnalyzer> ecg_analyzer,
-                         std::shared_ptr<FileManager> file_manager,
-                         std::shared_ptr<SystemMonitor> system_monitor,
-                         std::shared_ptr<TCPFileServer> tcp_server)
+                         std::unique_ptr<ECGAnalyzer> ecg_analyzer,
+                         std::unique_ptr<FileManager> file_manager,
+                         std::unique_ptr<SystemMonitor> system_monitor,
+                         std::unique_ptr<TCPFileServer> tcp_server)
   : data_source_ {data_source},
     buffer_raw_ {buffer_raw},
     buffer_classified_ {buffer_classified},
-    ecg_analyzer_ {ecg_analyzer},
-    file_manager_ {file_manager},
-    system_monitor_ {system_monitor},
-    tcp_server_ {tcp_server}
+    ecg_analyzer_ {std::move(ecg_analyzer)},
+    file_manager_ {std::move(file_manager)},
+    system_monitor_ {std::move(system_monitor)},
+    tcp_server_ {std::move(tcp_server)}
 {
   // Empty constructor
 }
@@ -56,8 +56,6 @@ bool Application::Start() {
   #endif
 
   LOG_SUCCESS("All components initialized successfully");
-
-  // TODO (allan): definir running_ aqui?
   running_ = true;
   return true;
 }

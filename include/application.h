@@ -17,14 +17,13 @@ class Application {
   private:
   
   // External dependencies
-  // TODO (allan): decidir quais devem ser unique_ptr e quais devem ser shared_ptr 
   std::shared_ptr<DataSource> data_source_;
   std::shared_ptr<RingBuffer<Sample>> buffer_raw_;
   std::shared_ptr<RingBuffer<Sample>> buffer_classified_;
-  std::shared_ptr<ECGAnalyzer> ecg_analyzer_;
-  std::shared_ptr<FileManager> file_manager_;
-  std::shared_ptr<SystemMonitor> system_monitor_;
-  std::shared_ptr<TCPFileServer> tcp_server_;
+  std::unique_ptr<ECGAnalyzer> ecg_analyzer_;
+  std::unique_ptr<FileManager> file_manager_;
+  std::unique_ptr<SystemMonitor> system_monitor_;
+  std::unique_ptr<TCPFileServer> tcp_server_;
 
   // Thread management
   std::thread acquisition_thread_;
@@ -39,10 +38,10 @@ class Application {
   Application(std::shared_ptr<DataSource> data_source,
               std::shared_ptr<RingBuffer<Sample>> buffer_raw,
               std::shared_ptr<RingBuffer<Sample>> buffer_classified,
-              std::shared_ptr<ECGAnalyzer> ecg_analyzer,
-              std::shared_ptr<FileManager> file_manager,
-              std::shared_ptr<SystemMonitor> system_monitor,
-              std::shared_ptr<TCPFileServer> tcp_server);
+              std::unique_ptr<ECGAnalyzer> ecg_analyzer,
+              std::unique_ptr<FileManager> file_manager,
+              std::unique_ptr<SystemMonitor> system_monitor,
+              std::unique_ptr<TCPFileServer> tcp_server);
   Application(const Application&) = delete;
   Application& operator=(const Application&) = delete;
   ~Application();

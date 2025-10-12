@@ -51,29 +51,29 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  auto buffer_raw = std::make_shared<RingBuffer<Sample>>(config::kBufferSize);
-  auto buffer_classified = std::make_shared<RingBuffer<Sample>>(config::kBufferSize);
-  auto ecg_analyzer = std::make_shared<ECGAnalyzer>(buffer_raw, buffer_classified);
-  auto file_manager = std::make_shared<FileManager>(
+  auto buffer_raw {std::make_shared<RingBuffer<Sample>>(config::kBufferSize)};
+  auto buffer_classified {std::make_shared<RingBuffer<Sample>>(config::kBufferSize)};
+  auto ecg_analyzer {std::make_unique<ECGAnalyzer>(buffer_raw, buffer_classified)};
+  auto file_manager {std::make_unique<FileManager>(
     buffer_classified,
     "cardiac_data",
     config::kFileWriteInterval
-  );
-  auto system_monitor = std::make_shared<SystemMonitor>();
-  std::shared_ptr<TCPFileServer> tcp_server;
+  )};
+  auto system_monitor {std::make_unique<SystemMonitor>()};
+  std::unique_ptr<TCPFileServer> tcp_server;
 
   #ifdef USE_HARDWARE_SOURCE
-  tcp_server = std::make_shared<TCPFileServer>();
+  tcp_server = std::make_unique<TCPFileServer>();
   #endif
 
   Application application{
     data_source,
     buffer_raw,
     buffer_classified,
-    ecg_analyzer,
-    file_manager,
-    system_monitor,
-    tcp_server
+    std::move(ecg_analyzer),
+    std::move(file_manager),
+    std::move(system_monitor),
+    std::move(tcp_server)
   };
 
   application.set_acquisition_duration(acquisition_duration);

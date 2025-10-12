@@ -11,8 +11,8 @@ ECGAnalyzer::ECGAnalyzer(std::shared_ptr<RingBuffer<Sample>> buffer_raw,
     buffer_classified_ {buffer_classified}
 {
   // Reserve space to avoid reallocations during execution
-  samples_.reserve(20000); // ~80 seconds at 250Hz // TODO (allan): relacionar com config.h
-  detected_beats_.reserve(200);   // ~200 beats max
+  samples_.reserve(config::kSampleRate * 2); // 2 seconds at configured rate 
+  detected_beats_.reserve(5);   // // ~2-3 beats max in 2-second window
 }
 
 
@@ -237,15 +237,26 @@ void ECGAnalyzer::TransferProcessedSamples() {
     buffer_classified_->AddData(samples_.at(i));
   }
   
-  // Log apenas ocasionalmente para evitar spam
-  size_t transferred = safe_transfer_pos - last_transferred_pos_;
-  static size_t total_transferred = 0;
-  total_transferred += transferred;
-  if (total_transferred % 100 == 0) {
-    LOG_DEBUG("Total transferred: %zu samples", total_transferred);
-  }
-  
   last_transferred_pos_ = safe_transfer_pos;
+  
+  // Remove old samples to prevent unbounded growth
+  if (last_transferred_pos_ > ecg_config::kTWindow) {
+    size_t samples_to_remove = last_transferred_pos_ - ecg_config::kTWindow;
+    samples_.erase(samples_.begin(), samples_.begin() + samples_to_remove);
+    
+    // Adjust all beat indices
+    for (auto& beat : detected_beats_) {
+      beat.r_pos -= samples_to_remove;
+      if (beat.qrs_complete) {
+        beat.q_pos -= samples_to_remove;
+        beat.s_pos -= samples_to_remove;
+      }
+      if (beat.p_complete) beat.p_pos -= samples_to_remove;
+      if (beat.t_complete) beat.t_pos -= samples_to_remove;
+    }
+    
+    last_transferred_pos_ = ecg_config::kTWindow;
+  }
 }
 
 
