@@ -5,6 +5,7 @@
 #include "file_manager.h"
 #include "logger.h"
 #include "ring_buffer.h"
+#include "signal_handler.h"
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -84,21 +85,33 @@ void Application::Run() {
 
   LOG_INFO("Waiting for acquisition to complete...");
 
-  if (acquisition_thread_.joinable()) {
-    acquisition_thread_.join();
+  // Wait for either acquisition completion or shutdown signal
+  while (running_.load() && !shutdown_requested_.load()) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
+  
+  // Check why we exited the loop
+  if (shutdown_requested_.load()) {
+    LOG_WARN("Shutdown requested by signal, initiating graceful shutdown...");
+    GracefulShutdown();
+  } else {
+    LOG_INFO("Acquisition finished normally, stopping processing threads...");
+    
+    if (acquisition_thread_.joinable()) {
+      acquisition_thread_.join();
+    }
 
-  LOG_INFO("Acquisition finished, stopping processing threads...");
-
-  ecg_analyzer_->Stop();
-  file_manager_->Stop();
-  #ifdef USE_HARDWARE_SOURCE
-  if (tcp_server_) {
-    LOG_INFO("Sending files to connected client (if any)...");
-    tcp_server_->SendAvailableFiles();
-    tcp_server_->Stop();
+    ecg_analyzer_->Stop();
+    file_manager_->Stop();
+    
+    #ifdef USE_HARDWARE_SOURCE
+    if (tcp_server_) {
+      LOG_INFO("Sending files to connected client (if any)...");
+      tcp_server_->SendAvailableFiles();
+      tcp_server_->Stop();
+    }
+    #endif
   }
-  #endif
 
   LOG_SUCCESS("All threads stopped successfully");
 }
@@ -129,14 +142,16 @@ void Application::AcquisitionLoop() {
   uint32_t expected_sample {0};
   
   try {
-    while (running_.load() && std::chrono::steady_clock::now() < end_time) {
+    while (running_.load() && 
+           !shutdown_requested_.load() && 
+           std::chrono::steady_clock::now() < end_time) {
       expected_sample++;
       
       auto target_time {start_time + (expected_sample * config::kSamplePeriod)};
       std::this_thread::sleep_until(target_time);
       
-      // Check if we should stop
-      if (!running_.load()) {
+      // Check if we should stop (either flag)
+      if (!running_.load() || shutdown_requested_.load()) {
         break;
       }
       
@@ -171,7 +186,11 @@ void Application::AcquisitionLoop() {
     LOG_ERROR("Exception in acquisition loop: %s", e.what());
   }
 
-  LOG_INFO("Acquisition duration completed.");
+  if (shutdown_requested_.load()) {
+    LOG_INFO("Acquisition interrupted by shutdown signal");
+  } else {
+    LOG_INFO("Acquisition duration completed");
+  }
   
   // Signal that acquisition is done
   running_ = false;
@@ -179,7 +198,53 @@ void Application::AcquisitionLoop() {
   // Signal shutdown to raw buffer to wake up waiting threads
   buffer_raw_->Shutdown();
   
-  LOG_INFO("Acquisition loop finished, signaled shutdown to processing threads");
+  LOG_INFO("Acquisition loop finished");
+}
+
+
+void Application::RequestShutdown() {
+  LOG_WARN("Shutdown requested via signal handler");
+  shutdown_requested_.store(true);
+  running_.store(false);
+}
+
+
+void Application::GracefulShutdown() {
+  LOG_INFO("Starting graceful shutdown sequence...");
+  
+  // Step 1: Stop acquisition immediately
+  running_.store(false);
+  
+  if (acquisition_thread_.joinable()) {
+    LOG_INFO("Waiting for acquisition thread to finish...");
+    acquisition_thread_.join();
+    LOG_SUCCESS("Acquisition thread stopped");
+  }
+  
+  // Step 2: Stop processing threads
+  LOG_INFO("Stopping ECG analyzer...");
+  ecg_analyzer_->Stop();
+  LOG_SUCCESS("ECG analyzer stopped");
+  
+  // Step 3: Flush and close files
+  LOG_INFO("Flushing file buffers...");
+  file_manager_->Stop();
+  LOG_SUCCESS("File manager stopped, all data saved");
+  
+  // Step 4: Handle TCP connections
+  #ifdef USE_HARDWARE_SOURCE
+  if (tcp_server_) {
+    if (tcp_server_->HasConnectedClient()) {
+      LOG_INFO("Client connected, attempting to send files...");
+      tcp_server_->SendAvailableFiles();
+    }
+    LOG_INFO("Stopping TCP server...");
+    tcp_server_->Stop();
+    LOG_SUCCESS("TCP server stopped");
+  }
+  #endif
+  
+  LOG_SUCCESS("Graceful shutdown completed");
 }
 
 

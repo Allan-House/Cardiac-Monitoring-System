@@ -38,6 +38,7 @@ set(SOURCES
   src/application.cpp
   src/ecg_analyzer.cpp
   src/file_manager.cpp
+  src/signal_handler.cpp
   src/tcp_file_server.cpp
 )
 

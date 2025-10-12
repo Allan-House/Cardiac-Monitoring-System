@@ -13,6 +13,7 @@
 #include "ring_buffer.h"
 #include "system_monitor.h"
 #include "tcp_file_server.h"
+#include "signal_handler.h"
 
 #ifdef USE_HARDWARE_SOURCE
 #include "ads1115.h"
@@ -22,6 +23,8 @@
 #ifdef USE_FILE_SOURCE
 #include "file_data.h"
 #endif
+
+static Application* g_application = nullptr;
 
 std::shared_ptr<DataSource> createDataSource(int argc, char** argv);
 void print_help(const char* program_name);
@@ -78,6 +81,19 @@ int main(int argc, char** argv) {
 
   application.set_acquisition_duration(acquisition_duration);
 
+  // Install signal handlers BEFORE starting application
+  g_application = &application;
+  
+  if (!SignalHandler::Init([&application]() {
+    // This callback runs in signal handler context
+    application.RequestShutdown();
+  })) {
+    LOG_ERROR("Failed to install signal handlers");
+    return 1;
+  }
+  
+  LOG_INFO("Signal handlers installed (Ctrl+C or SIGTERM to stop)");
+
   if (!application.Start()) {
     LOG_ERROR("Failed to start application");
     return 1;
@@ -86,7 +102,6 @@ int main(int argc, char** argv) {
   application.Run();
 
   LOG_SUCCESS("Application completed successfully");
-
 
   logger::shutdown();
   return 0;

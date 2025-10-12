@@ -27,10 +27,11 @@ class Application {
 
   // Thread management
   std::thread acquisition_thread_;
-
+  
   // Synchronization
   std::atomic<bool> running_ {false};
-
+  std::atomic<bool> shutdown_requested_ {false};
+  
   // Runtime configuration
   std::chrono::seconds acquisition_duration_ {70};
 
@@ -54,11 +55,15 @@ class Application {
   // Status
   bool Running() const {return running_.load();}
 
+  void RequestShutdown();
+
   void set_acquisition_duration(std::chrono::seconds duration);
   
   private:
   // Thread functions
   void AcquisitionLoop();
+
+  void GracefulShutdown();
 };
 
 #endif
