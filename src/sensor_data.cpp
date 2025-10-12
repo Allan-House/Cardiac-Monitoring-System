@@ -14,8 +14,15 @@ SensorData::SensorData(std::shared_ptr<ADS1115> ads1115)
 }
 
 
-float SensorData::ReadVoltage() {
-  return ads1115_->ReadVoltage();
+std::optional<float> SensorData::ReadVoltage() {
+  auto voltage {ads1115_->ReadVoltage()};
+  
+  if (!voltage) {
+    LOG_ERROR("Failed to read voltage from ADS1115");
+    return std::nullopt;
+  }
+
+  return voltage.value();
 }
 
 

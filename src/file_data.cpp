@@ -3,6 +3,7 @@
 #include "logger.h"
 #include <cstdint>
 #include <fstream>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -72,10 +73,10 @@ bool FileData::Initialized() const {
 }
 
 
-float FileData::ReadVoltage() {
-  // TODO (allan): padronizar erro de leitura.
+std::optional<float> FileData::ReadVoltage() {
   if (!initialized_ || !Available()) {
-    return 0.0f;
+    LOG_ERROR("Data not available for reading.");
+    return std::nullopt;
   }
 
   float voltage {samples_.at(current_index_).voltage};

@@ -25,18 +25,17 @@ ADS1115::~ADS1115() {
 }
 
 
-// TODO (allan): usar exception?
-uint16_t ADS1115::ReadRegister(uint8_t reg) {
+std::optional<uint16_t> ADS1115::ReadRegister(uint8_t reg) {
   if (i2c_fd_ < 0) {
     LOG_ERROR("I2C not initialized!");
-    return 0xFFFF;
+    return std::nullopt;
   }
   
   int result = wiringPiI2CReadReg16(i2c_fd_, reg);
   
   if (result < 0) {
     LOG_ERROR("Error reading register 0x%02X", static_cast<int>(reg));
-    return 0xFFFF;
+    return std::nullopt;
   }
   
   // WiringPi returns in little-endian, but ADS1115 uses big-endian.
@@ -119,61 +118,42 @@ bool ADS1115::Init() {
 }
 
 
-// TODO (allan): usar exception?
-int16_t ADS1115::ReadRawADC() {
-  // TODO (allan): usar exception?
+std::optional<int16_t> ADS1115::ReadRawADC() {
   if (!initialized_) {
     LOG_ERROR("ADS1115 not initialized! Call Init() first.");
-    return INT16_MIN;
+    return std::nullopt;
   }
 
-  uint16_t raw_data {ReadRegister(static_cast<uint8_t>(
+  auto raw_data {ReadRegister(static_cast<uint8_t>(
                                   ads1115_constants::Register::kConversion))};
-  return static_cast<int16_t>(raw_data);
-}
-
-
-// TODO (allan): usar exception?
-float ADS1115::ReadVoltage() {
-  int16_t raw_value {ReadRawADC()};
-
-  if (raw_value == INT16_MIN) {
-    LOG_ERROR("Error reading register ADS1115");
-    return kErrorVoltage;
+  
+  if (!raw_data) {
+    return std::nullopt;
   }
 
-  return ConvertToVoltage(raw_value);
+  return static_cast<int16_t>(raw_data.value());
 }
 
 
-// TODO (allan): usar exception?
-uint16_t ADS1115::ReadConfigRegisterFromHardware() {
+std::optional<float> ADS1115::ReadVoltage() {
+  auto raw_value {ReadRawADC()};
+
+  if (!raw_value) {
+    LOG_ERROR("Error reading register ADS1115");
+    return std::nullopt;
+  }
+
+  return ConvertToVoltage(raw_value.value());
+}
+
+
+std::optional<uint16_t> ADS1115::ReadConfigRegister() {
   if (!initialized_) {
     LOG_ERROR("ADS1115 not initialized! Call Init() first.");
-    return 0xFFFF;
+    return std::nullopt;
   }
   
   return ReadRegister(static_cast<uint8_t>(ads1115_constants::Register::kConfig));
-}
-
-
-// TODO (allan): manter essa função?
-bool ADS1115::VerifyConfigRegister() {
-  uint16_t hardware_value {ReadConfigRegisterFromHardware()};
-  
-  if (hardware_value == 0xFFFF) {
-    return false;
-  }
-  
-  bool match {(hardware_value == config_register_)};
-  
-  if (!match) {
-    std::cout << "Config register mismatch!" << std::endl;
-    std::cout << "  Memory:   0x" << std::hex << config_register_ << std::endl;
-    std::cout << "  Hardware: 0x" << std::hex << hardware_value << std::endl;
-  }
-  
-  return match;
 }
 
 

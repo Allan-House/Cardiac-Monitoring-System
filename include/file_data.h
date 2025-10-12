@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 #include <vector>
 
 struct FileDataSample {
@@ -32,7 +33,7 @@ class FileData : public DataSource {
   
   bool Initialized() const;
   
-  float ReadVoltage() override;
+  std::optional<float> ReadVoltage() override;
   bool Available() const override;
   
   // File data management

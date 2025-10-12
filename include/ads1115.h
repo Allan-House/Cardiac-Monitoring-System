@@ -4,6 +4,7 @@
 #include "config.h"
 #include <cstdint>
 #include <iostream>
+#include <optional>
 #include <wiringPi.h>
 #include <wiringPiI2C.h>
 
@@ -100,9 +101,6 @@ namespace ads1115_constants {
  * @note Requires wiringPi library for I2C communication.
  */
 class ADS1115 {
-  // TODO (allan): Pensar melhor em como lidar com erros de leitura.
-  static constexpr float kErrorVoltage = -999.0f;
-
   private:
   uint16_t config_register_;
   uint8_t i2c_address_;
@@ -115,7 +113,7 @@ class ADS1115 {
    * @param reg Register address to read from
    * @return 16-bit register value, or 0xFFFF on error
    */
-  uint16_t ReadRegister(uint8_t reg);
+  std::optional<uint16_t> ReadRegister(uint8_t reg);
 
   /**
    * @brief Writes a 16-bit value to an ADS1115 register.
@@ -174,7 +172,7 @@ class ADS1115 {
    * 
    * @return Signed 16-bit raw ADC value, or INT16_MIN on error
    */
-  int16_t ReadRawADC();
+  std::optional<int16_t> ReadRawADC();
 
   /**
    * @brief Reads ADC value and converts to voltage.
@@ -184,21 +182,14 @@ class ADS1115 {
    * 
    * @return Voltage in volts, or kErrorVoltage (-999.0) on error
    */
-  float ReadVoltage();
+  std::optional<float> ReadVoltage();
 
   /**
    * @brief Reads current configuration register from hardware.
    * 
    * @return Current configuration register value from the device
    */
-  uint16_t ReadConfigRegisterFromHardware();
-
-  /**
-   * @brief Verifies that hardware config matches cached config.
-   * 
-   * @return true if hardware and cached config registers match
-   */
-  bool VerifyConfigRegister();
+  std::optional<uint16_t> ReadConfigRegister();
   
   void set_data_rate(ads1115_constants::DataRate data_rate);
   void set_mode(ads1115_constants::Mode mode);

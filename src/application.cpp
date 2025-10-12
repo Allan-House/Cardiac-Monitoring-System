@@ -121,8 +121,8 @@ void Application::Stop() {
 void Application::AcquisitionLoop() {
   LOG_INFO("Starting acquisition for %ld seconds.", acquisition_duration_.count());
 
-  auto start_time = std::chrono::steady_clock::now();
-  auto end_time = start_time + acquisition_duration_;
+  auto start_time {std::chrono::steady_clock::now()};
+  auto end_time {start_time + acquisition_duration_};
   
   #ifdef DEBUG
   uint32_t sample_count{0};
@@ -134,7 +134,7 @@ void Application::AcquisitionLoop() {
     while (running_.load() && std::chrono::steady_clock::now() < end_time) {
       expected_sample++;
       
-      auto target_time = start_time + (expected_sample * config::kSamplePeriod);
+      auto target_time {start_time + (expected_sample * config::kSamplePeriod)};
       std::this_thread::sleep_until(target_time);
       
       // Check if we should stop
@@ -142,7 +142,14 @@ void Application::AcquisitionLoop() {
         break;
       }
       
-      Sample sample{data_source_->ReadVoltage(), std::chrono::steady_clock::now()};
+      auto voltage {data_source_->ReadVoltage()};
+
+      if (!voltage) {
+        LOG_WARN("Failed to read voltage, skipping sample");
+        continue;
+      }
+
+      Sample sample{voltage.value(), std::chrono::steady_clock::now()};
       buffer_raw_->AddData(sample);
 
       #ifdef DEBUG
@@ -154,8 +161,8 @@ void Application::AcquisitionLoop() {
       #endif
       
       // Auto-correction: if too late, skip a sample
-      auto now = std::chrono::steady_clock::now();
-      auto delay = std::chrono::duration_cast<std::chrono::microseconds>(now - target_time).count();
+      auto now {std::chrono::steady_clock::now()};
+      auto delay {std::chrono::duration_cast<std::chrono::microseconds>(now - target_time).count()};
       
       if (delay > 2000) { // If more than 2ms late
         LOG_WARN("High delay detected: %ldμs, skipping to catch up", delay);
