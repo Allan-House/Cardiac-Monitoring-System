@@ -1,10 +1,13 @@
 #include "file_manager.h"
-#include "logger.h"
-#include <filesystem>
-#include <iostream>
-#include <iomanip>
-#include <sstream>
 
+#include "logger.h"
+
+/**
+ * @brief Converts wave type enum to string representation.
+ * 
+ * @param type Wave type classification
+ * @return Single character string: "P", "Q", "R", "S", "T", "N", or "-"
+ */
 std::string WaveTypeToString(WaveType type) {
   switch (type) {
     case WaveType::kNormal: return "N";
@@ -25,7 +28,7 @@ FileManager::FileManager(std::shared_ptr<RingBuffer<Sample>> buffer,
     write_interval_ {write_interval}
 {
   CreateDirectories();
-  std::string timestamp = GenerateTimestamp();
+  std::string timestamp {GenerateTimestamp()};
   
   bin_filename_ = "data/processed/" + base_filename + "_" + timestamp + ".bin";
   csv_filename_ = "data/processed/" + base_filename + "_" + timestamp + ".csv";
@@ -39,8 +42,8 @@ void FileManager::CreateDirectories() {
 
 
 std::string FileManager::GenerateTimestamp() {
-  auto now = std::chrono::system_clock::now();
-  auto time_t = std::chrono::system_clock::to_time_t(now);
+  auto now {std::chrono::system_clock::now()};
+  auto time_t {std::chrono::system_clock::to_time_t(now)};
   
   std::stringstream ss;
   ss << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S");
@@ -162,27 +165,31 @@ void FileManager::WriteAvailableData() {
 
 
 void FileManager::WriteSample(const Sample& sample) {
-  auto duration = sample.timestamp.time_since_epoch();
-  auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+  auto duration {sample.timestamp.time_since_epoch()};
+  auto microseconds {
+    std::chrono::duration_cast<std::chrono::microseconds>(duration).count()
+  };
   
   // Normalize using the first timestamp
   if (!first_timestamp_) {
     first_timestamp_ = microseconds;
   }
   
-  uint64_t normalized_timestamp = microseconds - first_timestamp_.value();
+  uint64_t normalized_timestamp {microseconds - first_timestamp_.value()};
   
   // Binary
   if (bin_stream_ && bin_stream_->is_open()) {
     // Converts voltage to int16_t
-    float scaled {sample.voltage * 32768.0f / 4.096f};
+    float scaled {sample.voltage * 32768.0f / config::kVoltageRange};
     if (scaled > 32767) {scaled = 32767;}
     if (scaled < -32768) {scaled = -32768;}
     int16_t raw_data = static_cast<int16_t>(scaled);
 
     //
-    int64_t timestamp_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                           sample.timestamp.time_since_epoch()).count();
+    int64_t timestamp_us {
+      std::chrono::duration_cast<std::chrono::microseconds>(
+        sample.timestamp.time_since_epoch()).count()
+    };
 
     bin_stream_->write(reinterpret_cast<char*>(&raw_data), sizeof(raw_data));
     bin_stream_->write(reinterpret_cast<char*>(&timestamp_us), sizeof(timestamp_us));
@@ -191,7 +198,7 @@ void FileManager::WriteSample(const Sample& sample) {
 
   // CSV
   if (csv_stream_ && csv_stream_->is_open()) {
-  std::string classification_str = WaveTypeToString(sample.classification);
+  std::string classification_str {WaveTypeToString(sample.classification)};
   std::string line {std::to_string(normalized_timestamp) + "," + 
                     std::to_string(sample.voltage) + "," +
                     classification_str + "\n"};

@@ -1,8 +1,6 @@
 #include "sensor_data.h"
-#include "ads1115.h"
+
 #include "logger.h"
-#include <memory>
-#include <utility>
 
 SensorData::SensorData(std::shared_ptr<ADS1115> ads1115)
   : ads1115_ {ads1115}

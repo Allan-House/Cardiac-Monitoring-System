@@ -1,11 +1,6 @@
-#include "data_source.h"
 #include "file_data.h"
+
 #include "logger.h"
-#include <cstdint>
-#include <fstream>
-#include <optional>
-#include <string>
-#include <vector>
 
 FileData::FileData(const std::string& filename, float voltage_range, bool loop)
 : voltage_range_ {voltage_range},

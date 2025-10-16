@@ -301,7 +301,7 @@ namespace logger {
     Logger::instance().log_internal(Level::kDebug, "%s", buffer);
   }
 
-} // namespace logger
+}
 
 // Convenience macros
 #define LOG_CRITICAL(...) logger::log_kCritical(__VA_ARGS__)

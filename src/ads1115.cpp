@@ -1,18 +1,24 @@
 #include "ads1115.h"
-#include "logger.h"
+
 #include <unistd.h>
+
+#include <wiringPi.h>
 #include <wiringPiI2C.h>
 
+#include "logger.h"
+
 ADS1115::ADS1115(uint8_t address) :
-config_register_ {static_cast<uint16_t>(ads1115_constants::Mux::kA0_GND)       |
-                  static_cast<uint16_t>(ads1115_constants::Gain::kFSR_4_096V)  | 
-                  static_cast<uint16_t>(ads1115_constants::Mode::kContinuous)  |
-                  static_cast<uint16_t>(ads1115_constants::GetConfigDataRate())|
-                  0x0003},
+config_register_ {
+  static_cast<uint16_t>(ads1115_constants::Mux::kA0_GND)        |
+  static_cast<uint16_t>(ads1115_constants::Gain::kFSR_4_096V)   | 
+  static_cast<uint16_t>(ads1115_constants::Mode::kContinuous)   |
+  static_cast<uint16_t>(ads1115_constants::GetConfigDataRate()) |
+  0x0003
+},
 i2c_address_ {address},
 i2c_fd_ {-1},
 initialized_ {false},
-voltage_range_ {2.048f}
+voltage_range_ {config::kVoltageRange}
 {
   CalculateVoltageRange();
 }
@@ -31,7 +37,7 @@ std::optional<uint16_t> ADS1115::ReadRegister(uint8_t reg) {
     return std::nullopt;
   }
   
-  int result = wiringPiI2CReadReg16(i2c_fd_, reg);
+  int result {wiringPiI2CReadReg16(i2c_fd_, reg)};
   
   if (result < 0) {
     LOG_ERROR("Error reading register 0x%02X", static_cast<int>(reg));
@@ -50,8 +56,8 @@ bool ADS1115::WriteRegister(uint8_t reg, uint16_t value) {
   }
   
   // WiringPiWriteReg16 expects little-endian, but ADS1115 expects big-endian.
-  int result = wiringPiI2CWriteReg16(i2c_fd_, reg, ((value & 0xFF) << 8) |
-                                                   ((value & 0xFF00) >> 8));
+  int result {wiringPiI2CWriteReg16(i2c_fd_, reg, ((value & 0xFF) << 8) |
+                                                  ((value & 0xFF00) >> 8))};
   
   if (result < 0) {
     LOG_ERROR("Error writing register 0x%02X", static_cast<int>(reg));
@@ -63,7 +69,7 @@ bool ADS1115::WriteRegister(uint8_t reg, uint16_t value) {
 
 
 void ADS1115::CalculateVoltageRange() {
-  uint16_t gain = config_register_ & 0x0E00;
+  uint16_t gain {config_register_ & 0x0E00};
   switch (static_cast<ads1115_constants::Gain>(gain)) {
     case ads1115_constants::Gain::kFSR_6_144V: voltage_range_ = 6.144f; break;
     case ads1115_constants::Gain::kFSR_4_096V: voltage_range_ = 4.096f; break;
@@ -157,7 +163,6 @@ std::optional<uint16_t> ADS1115::ReadConfigRegister() {
 }
 
 
-// Setters
 void ADS1115::set_data_rate(ads1115_constants::DataRate data_rate) {
   config_register_ &= ~0x00E0;
   config_register_ |= static_cast<uint16_t>(data_rate);

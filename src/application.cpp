@@ -1,15 +1,8 @@
-#include "ads1115.h"
 #include "application.h"
-#include "config.h"
-#include "ecg_analyzer.h"
-#include "file_manager.h"
-#include "logger.h"
-#include "ring_buffer.h"
-#include "signal_handler.h"
-#include <chrono>
+
 #include <cstdint>
-#include <memory>
-#include <thread>
+
+#include "logger.h"
 
 Application::Application(std::shared_ptr<DataSource> data_source,
                          std::shared_ptr<RingBuffer<Sample>> buffer_raw,

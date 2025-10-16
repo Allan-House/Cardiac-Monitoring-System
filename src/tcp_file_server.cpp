@@ -1,14 +1,18 @@
 #include "tcp_file_server.h"
-#include "logger.h"
+
+#include <unistd.h>
+
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
-#include <sys/socket.h>
-#include <netinet/in.h>
+
 #include <arpa/inet.h>
-#include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+
+#include "logger.h"
 
 TCPFileServer::TCPFileServer(uint16_t port, const std::string& data_directory)
   : port_ {port},

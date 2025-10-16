@@ -1,12 +1,10 @@
 #ifndef ADS_1115_H_
 #define ADS_1115_H_
 
-#include "config.h"
 #include <cstdint>
-#include <iostream>
 #include <optional>
-#include <wiringPi.h>
-#include <wiringPiI2C.h>
+
+#include "config.h"
 
 namespace ads1115_constants {
   enum class Address : uint8_t {
@@ -111,7 +109,7 @@ class ADS1115 {
   /**
    * @brief Reads a 16-bit register from the ADS1115.
    * @param reg Register address to read from
-   * @return 16-bit register value, or 0xFFFF on error
+   * @return 16-bit register value, or std::nullopt on error
    */
   std::optional<uint16_t> ReadRegister(uint8_t reg);
 
@@ -141,7 +139,11 @@ class ADS1115 {
   /**
    * @brief Constructs ADS1115 driver with specified I2C address.
    * 
-   * Initializes with: A0 to GND, ±2.048V range, continuous mode, 128 SPS.
+   * Initializes configuration with:
+   * - Channel: A0 to GND
+   * - Gain: ±4.096V range
+   * - Mode: Continuous conversion
+   * - Data rate: Configured by config::kSampleRate
    * 
    * @param address I2C address of the ADS1115 device
    *                (default: 0x48 when ADDR pin connected to GND)
@@ -156,8 +158,8 @@ class ADS1115 {
   /**
    * @brief Initializes I2C communication and configures the ADS1115.
    * 
-   * Sets up wiringPi I2C interface and configures the device with constructor
-   * settings (continuous mode, ±2.048V range, 128 SPS).
+   * Sets up wiringPi I2C interface and writes the configuration register
+   * with settings defined in the constructor.
    * 
    * @return true if initialization successful, false on error
    */
@@ -170,7 +172,7 @@ class ADS1115 {
    * this is the latest conversion. In single-shot mode, this is the last
    * completed conversion.
    * 
-   * @return Signed 16-bit raw ADC value, or INT16_MIN on error
+   * @return Signed 16-bit raw ADC value, or std::nullopt on error
    */
   std::optional<int16_t> ReadRawADC();
 
@@ -180,7 +182,7 @@ class ADS1115 {
    * Performs ADC reading and converts the result to voltage based on
    * current gain/range settings.
    * 
-   * @return Voltage in volts, or kErrorVoltage (-999.0) on error
+   * @return Voltage in volts, or std::nullopt on error
    */
   std::optional<float> ReadVoltage();
 
@@ -191,12 +193,13 @@ class ADS1115 {
    */
   std::optional<uint16_t> ReadConfigRegister();
   
+  uint16_t get_config_register() const {return config_register_;}
+  
   void set_data_rate(ads1115_constants::DataRate data_rate);
   void set_mode(ads1115_constants::Mode mode);
   void set_gain(ads1115_constants::Gain gain);
   void set_mux(ads1115_constants::Mux mux);
 
-  uint16_t get_config_register() const {return config_register_;}
 };
 
 #endif

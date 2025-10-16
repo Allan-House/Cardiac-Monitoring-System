@@ -1,6 +1,11 @@
 #ifndef APPLICATION_H_
 #define APPLICATION_H_
 
+#include <atomic>
+#include <chrono>
+#include <memory>
+#include <thread>
+
 #include "config.h"
 #include "data_source.h"
 #include "ecg_analyzer.h"
@@ -8,10 +13,6 @@
 #include "ring_buffer.h"
 #include "system_monitor.h"
 #include "tcp_file_server.h"
-#include <atomic>
-#include <condition_variable>
-#include <memory>
-#include <thread>
 
 class Application {
   private:
@@ -33,7 +34,7 @@ class Application {
   std::atomic<bool> shutdown_requested_ {false};
   
   // Runtime configuration
-  std::chrono::seconds acquisition_duration_ {70};
+  std::chrono::seconds acquisition_duration_ {config::kAcquisitionDuration};
 
   public:
   Application(std::shared_ptr<DataSource> data_source,

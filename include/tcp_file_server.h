@@ -1,14 +1,12 @@
 #ifndef TCP_FILE_SERVER_H_
 #define TCP_FILE_SERVER_H_
 
-
 #include <atomic>
 #include <cstdint>
-#include <string>
-#include <vector>
-#include <thread>
 #include <mutex>
-
+#include <string>
+#include <thread>
+#include <vector>
 
 /**
 * @brief Simple TCP server for file transfer

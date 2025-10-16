@@ -6,8 +6,15 @@
 #include <cstdlib>
 
 namespace config {
-  // Timing configuration
-  constexpr uint16_t kSampleRate {250};  // Samples per second (SPS)
+  
+  constexpr float kVoltageRange {4.096f};
+
+  static_assert(kVoltageRange == 6.144f || kVoltageRange == 4.096f ||
+                kVoltageRange == 2.048f || kVoltageRange == 1.024f ||
+                kVoltageRange == 0.512f || kVoltageRange == 0.256f,
+                "[ERROR] - Voltage range must match ADS1115 options.");
+  
+  constexpr uint16_t kSampleRate {475};  // Samples per second (SPS)
 
   static_assert(kSampleRate == 8   || kSampleRate == 16  ||
                 kSampleRate == 32  || kSampleRate == 64  ||
@@ -19,17 +26,13 @@ namespace config {
   constexpr int kPeriodUs {static_cast<int>(kPeriodSeconds * 1'000'000)};  // 4000 μs
   constexpr auto kSamplePeriod {std::chrono::microseconds(kPeriodUs)};
   
-  // Acquisition configuration
   constexpr std::chrono::seconds kAcquisitionDuration {70};
   
-  // Buffer configuration 
-  constexpr size_t kBufferSize = kSampleRate * kAcquisitionDuration.count();
+  constexpr size_t kBufferSize {kSampleRate * kAcquisitionDuration.count()};
   
-  // File management configuration
-  constexpr auto kFileWriteInterval = std::chrono::milliseconds(200);
+  constexpr auto kFileWriteInterval {std::chrono::milliseconds(200)};
   
-  // Logging configuration
-  constexpr const char* kDefaultLogFile = "cardiac_system.log";
+  constexpr const char* kDefaultLogFile {"cardiac_system.log"};
   
 }
 

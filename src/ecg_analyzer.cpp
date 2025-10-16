@@ -1,9 +1,8 @@
 #include "ecg_analyzer.h"
-#include "logger.h"
-#include "ring_buffer.h"
+
 #include <cstdint>
-#include <thread>
-#include <iostream>
+
+#include "logger.h"
 
 ECGAnalyzer::ECGAnalyzer(std::shared_ptr<RingBuffer<Sample>> buffer_raw,
                          std::shared_ptr<RingBuffer<Sample>> buffer_classified)
@@ -40,11 +39,11 @@ void ECGAnalyzer::ProcessingLoop() {
   LOG_INFO("Starting ECG processing thread...");
 
   #ifdef DEBUG
-  uint32_t sample_count = 0;
+  uint32_t sample_count {0};
   #endif
 
   while (processing_) {
-    auto data = buffer_raw_->Consume();
+    auto data {buffer_raw_->Consume()};
     
     if (!data) {
       LOG_INFO("Processing interrupted - buffer shutdown");
@@ -65,7 +64,7 @@ void ECGAnalyzer::ProcessingLoop() {
   LOG_INFO("Processing remaining samples in buffer...");
   
   // Process remaining samples
-  auto data = buffer_raw_->Consume();
+  auto data {buffer_raw_->Consume()};
   while (data) {
     ProcessSample(data.value());
     data = buffer_raw_->Consume();
@@ -108,9 +107,9 @@ bool ECGAnalyzer::IsRPeak(size_t pos) const {
     return false;
   }
   
-  const Sample& prev = samples_.at(pos - 1);
-  const Sample& curr = samples_.at(pos);
-  const Sample& next = samples_.at(pos + 1);
+  const Sample& prev {samples_.at(pos - 1)};
+  const Sample& curr {samples_.at(pos)};
+  const Sample& next {samples_.at(pos + 1)};
   
   // Peak detection: higher than neighbors and above threshold
   bool is_peak {(curr.voltage > prev.voltage) && 
@@ -135,11 +134,11 @@ void ECGAnalyzer::ProcessCompleteBeats() {
     // Detect QRS complex (Q and S points)
     if (!beat.qrs_complete && CanCompleteQRS(beat.r_pos)) {
       // Q point: lowest signal value in 80ms before R
-      size_t q_start = beat.r_pos - ecg_config::kQSWindow;
+      size_t q_start {beat.r_pos - ecg_config::kQSWindow};
       beat.q_pos = FindLowest(q_start, beat.r_pos);
       
       // S point: lowest signal value in 80ms after R
-      size_t s_end = beat.r_pos + ecg_config::kQSWindow;
+      size_t s_end {beat.r_pos + ecg_config::kQSWindow};
       beat.s_pos = FindLowest(beat.r_pos + 1, s_end);
       
       beat.qrs_complete = true;
@@ -148,7 +147,7 @@ void ECGAnalyzer::ProcessCompleteBeats() {
     
     // Detect P wave (highest in 200ms before Q)
     if (beat.qrs_complete && !beat.p_complete && CanCompleteP(beat.q_pos)) {
-      size_t p_start = beat.q_pos - ecg_config::kPWindow;
+      size_t p_start {beat.q_pos - ecg_config::kPWindow};
       beat.p_pos = FindHighest(p_start, beat.q_pos);
       beat.p_complete = true;
       LOG_DEBUG("P wave completed for beat at %zu", beat.r_pos);
@@ -156,7 +155,7 @@ void ECGAnalyzer::ProcessCompleteBeats() {
     
     // Detect T wave (highest in 400ms after S)
     if (beat.qrs_complete && !beat.t_complete && CanCompleteT(beat.s_pos)) {
-      size_t t_end = beat.s_pos + ecg_config::kTWindow;
+      size_t t_end {beat.s_pos + ecg_config::kTWindow};
       beat.t_pos = FindHighest(beat.s_pos + 1, t_end);
       beat.t_complete = true;
       LOG_DEBUG("T wave completed for beat at %zu", beat.r_pos);
@@ -186,8 +185,8 @@ size_t ECGAnalyzer::FindLowest(size_t start, size_t end) const {
     return start;
   }
   
-  size_t lowest_idx = start;
-  float lowest_value = samples_.at(start).voltage;
+  size_t lowest_idx {start};
+  float lowest_value {samples_.at(start).voltage};
   
   for (size_t i = start + 1; i <= end; i++) {
     if (samples_.at(i).voltage < lowest_value) {
@@ -205,8 +204,8 @@ size_t ECGAnalyzer::FindHighest(size_t start, size_t end) const {
     return start;
   }
   
-  size_t highest_idx = start;
-  float highest_value = samples_.at(start).voltage;
+  size_t highest_idx {start};
+  float highest_value {samples_.at(start).voltage};
   
   for (size_t i = start + 1; i <= end; i++) {
     if (samples_.at(i).voltage > highest_value) {
@@ -224,7 +223,7 @@ void ECGAnalyzer::TransferProcessedSamples() {
     return;
   }
   
-  size_t safe_transfer_pos = samples_.size() - ecg_config::kTWindow;
+  size_t safe_transfer_pos {samples_.size() - ecg_config::kTWindow};
   
   if (safe_transfer_pos <= last_transferred_pos_) {
     return;
@@ -241,7 +240,7 @@ void ECGAnalyzer::TransferProcessedSamples() {
   
   // Remove old samples to prevent unbounded growth
   if (last_transferred_pos_ > ecg_config::kTWindow) {
-    size_t samples_to_remove = last_transferred_pos_ - ecg_config::kTWindow;
+    size_t samples_to_remove {last_transferred_pos_ - ecg_config::kTWindow};
     samples_.erase(samples_.begin(), samples_.begin() + samples_to_remove);
     
     // Adjust all beat indices
@@ -310,7 +309,7 @@ void ECGAnalyzer::ProcessFinalData() {
            detected_beats_.size());
   
   #ifdef DEBUG
-  size_t complete_beats = 0;
+  size_t complete_beats {0};
   for (const auto& beat : detected_beats_) {
     if (beat.qrs_complete && beat.p_complete && beat.t_complete) {
       complete_beats++;
