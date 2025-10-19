@@ -40,12 +40,12 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  logger::init(config::kDefaultLogFile, logger::Level::kDebug);
-
   std::cout << "==================================" << std::endl;
   std::cout << "Cardiac Monitoring System Starting" << std::endl;
   std::cout << "==================================" << std::endl;
-
+  
+  logger::init(config::kDefaultLogFile, logger::Level::kDebug);
+  
   // Create data source based on compilation target
   auto data_source = createDataSource(argc, argv);
   

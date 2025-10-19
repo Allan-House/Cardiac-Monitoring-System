@@ -313,8 +313,10 @@ data/
 ### Building for Release
 
 ```bash
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j$(nproc)
+cmake -S . -B build/ \
+-DCMAKE_TOOLCHAIN_FILE=rpi3-toolchain.cmake \
+-DCMAKE_BUILD_TYPE=Release
+cmake --build build/
 ```
 
 Release builds disable debug logging for better performance.
@@ -325,4 +327,4 @@ This project is provided as-is for educational and research purposes.
 
 ## Author
 
-Developed as an embedded ECG monitoring system with real-time analysis capabilities.
+Developed as part of the undergraduate thesis (TCC) in Computer Engineering, focused on building an embedded ECG monitoring system with real-time signal analysis capabilities.

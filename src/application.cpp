@@ -129,10 +129,6 @@ void Application::AcquisitionLoop() {
   auto start_time {std::chrono::steady_clock::now()};
   auto end_time {start_time + acquisition_duration_};
   
-  #ifdef DEBUG
-  uint32_t sample_count{0};
-  #endif
-  
   uint32_t expected_sample {0};
   
   try {
@@ -158,14 +154,6 @@ void Application::AcquisitionLoop() {
 
       Sample sample{voltage.value(), std::chrono::steady_clock::now()};
       buffer_raw_->AddData(sample);
-
-      #ifdef DEBUG
-      sample_count++;
-      if (sample_count % config::kSampleRate == 0) {
-        std::cout << "Samples collected: " << sample_count 
-                  << std::endl;
-      }
-      #endif
       
       // Auto-correction: if too late, skip a sample
       auto now {std::chrono::steady_clock::now()};
