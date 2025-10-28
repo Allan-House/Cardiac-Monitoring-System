@@ -69,7 +69,7 @@ bool ADS1115::WriteRegister(uint8_t reg, uint16_t value) {
 
 
 void ADS1115::CalculateVoltageRange() {
-  uint16_t gain {config_register_ & 0x0E00};
+  uint16_t gain {static_cast<uint16_t>(config_register_ & 0x0E00)};
   switch (static_cast<ads1115_constants::Gain>(gain)) {
     case ads1115_constants::Gain::kFSR_6_144V: voltage_range_ = 6.144f; break;
     case ads1115_constants::Gain::kFSR_4_096V: voltage_range_ = 4.096f; break;

@@ -56,10 +56,6 @@ bool Application::Start() {
 }
 
 
-// TODO (allan): adicionar callback de controle:
-//               - Verificação de sinais (CTRL+C)
-//               - Condições de parada específicas
-//               - Monitoramento de sistema
 void Application::Run() {
   if (!running_.load()) {
     LOG_ERROR("Application not started. Call Start() first.");
@@ -130,7 +126,10 @@ void Application::AcquisitionLoop() {
   auto end_time {start_time + acquisition_duration_};
   
   uint32_t expected_sample {0};
-  
+  #ifdef DEBUG
+  auto last_log_time {start_time};
+  #endif
+
   try {
     while (running_.load() && 
            !shutdown_requested_.load() && 
@@ -155,8 +154,17 @@ void Application::AcquisitionLoop() {
       Sample sample{voltage.value(), std::chrono::steady_clock::now()};
       buffer_raw_->AddData(sample);
       
-      // Auto-correction: if too late, skip a sample
       auto now {std::chrono::steady_clock::now()};
+      
+      #ifdef DEBUG
+      if (std::chrono::duration_cast<std::chrono::seconds>(now - last_log_time).count() >= 1) {
+        auto elapsed {std::chrono::duration_cast<std::chrono::seconds>(now - start_time).count()};
+        LOG_DEBUG("Acquisition progress: %ld/%ld seconds", elapsed, acquisition_duration_.count());
+        last_log_time = now;
+      }
+      #endif
+
+      // Auto-correction: if too late, skip a sample
       auto delay {std::chrono::duration_cast<std::chrono::microseconds>(now - target_time).count()};
       
       if (delay > 2000) { // If more than 2ms late

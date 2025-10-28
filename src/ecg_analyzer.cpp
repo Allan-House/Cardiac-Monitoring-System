@@ -38,10 +38,6 @@ void ECGAnalyzer::Stop() {
 void ECGAnalyzer::ProcessingLoop() {
   LOG_INFO("Starting ECG processing thread...");
 
-  #ifdef DEBUG
-  uint32_t sample_count {0};
-  #endif
-
   while (processing_) {
     auto data {buffer_raw_->Consume()};
     
@@ -51,14 +47,6 @@ void ECGAnalyzer::ProcessingLoop() {
     }
     
     ProcessSample(data.value());
-
-    #ifdef DEBUG
-    sample_count++;
-    if (sample_count % 1000 == 0) {
-      LOG_DEBUG("Processed %u samples, detected %zu beats", 
-                sample_count, detected_beats_.size());
-    }
-    #endif
   }
 
   LOG_INFO("Processing remaining samples in buffer...");
@@ -97,7 +85,6 @@ void ECGAnalyzer::DetectRPeaks() {
   
   if (IsRPeak(check_position)) {
     detected_beats_.emplace_back(check_position);
-    LOG_DEBUG("R peak detected at position %zu", check_position);
   }
 }
 
@@ -142,7 +129,6 @@ void ECGAnalyzer::ProcessCompleteBeats() {
       beat.s_pos = FindLowest(beat.r_pos + 1, s_end);
       
       beat.qrs_complete = true;
-      LOG_DEBUG("QRS complex completed for beat at %zu", beat.r_pos);
     }
     
     // Detect P wave (highest in 200ms before Q)
@@ -150,7 +136,6 @@ void ECGAnalyzer::ProcessCompleteBeats() {
       size_t p_start {beat.q_pos - ecg_config::kPWindow};
       beat.p_pos = FindHighest(p_start, beat.q_pos);
       beat.p_complete = true;
-      LOG_DEBUG("P wave completed for beat at %zu", beat.r_pos);
     }
     
     // Detect T wave (highest in 400ms after S)
@@ -158,7 +143,6 @@ void ECGAnalyzer::ProcessCompleteBeats() {
       size_t t_end {beat.s_pos + ecg_config::kTWindow};
       beat.t_pos = FindHighest(beat.s_pos + 1, t_end);
       beat.t_complete = true;
-      LOG_DEBUG("T wave completed for beat at %zu", beat.r_pos);
     }
   }
 }
