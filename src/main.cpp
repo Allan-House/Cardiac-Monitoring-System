@@ -171,7 +171,6 @@ bool parse_arguments(int argc, char** argv,
 
 std::shared_ptr<DataSource> createDataSource(int argc, char** argv) {
 #ifdef USE_HARDWARE_SOURCE
-  std::cout << "Using hardware data source (Raspberry Pi)" << std::endl;
   auto ads1115 = std::make_shared<ADS1115>();
   return std::make_shared<SensorData>(ads1115);
   
@@ -188,7 +187,6 @@ std::shared_ptr<DataSource> createDataSource(int argc, char** argv) {
     }
   }
   
-  std::cout << "Using file data source: " << filename << std::endl;
   return std::make_shared<FileData>(filename);
   
 #else
