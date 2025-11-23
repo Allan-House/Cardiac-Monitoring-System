@@ -44,7 +44,13 @@ int main(int argc, char** argv) {
   std::cout << "Cardiac Monitoring System Starting" << std::endl;
   std::cout << "==================================" << std::endl;
   
-  logger::init(config::kDefaultLogFile, logger::Level::kDebug);
+  logger::Level log_level;
+  #ifdef DEBUG
+  log_level = logger::Level::kDebug;
+  #else
+  log_level = logger::Level::kInfo;
+  #endif
+  logger::init(config::kDefaultLogFile, log_level);
   
   // Create data source based on compilation target
   auto data_source = createDataSource(argc, argv);
@@ -115,7 +121,7 @@ void print_help(const char* program_name) {
   
   #ifdef USE_FILE_SOURCE
     std::cout << "  <filename>              Input ECG data file";
-    std::cout << " (default: data/raw/ecg_samples.bin)\n";
+    std::cout << " (default: data/ecg_samples.bin)\n";
   #endif
   
   std::cout << "  -d, --duration <sec>    Acquisition duration in seconds";
@@ -175,7 +181,7 @@ std::shared_ptr<DataSource> createDataSource(int argc, char** argv) {
   return std::make_shared<SensorData>(ads1115);
   
 #elif defined(USE_FILE_SOURCE)
-  std::string filename = "data/raw/ecg_samples.bin"; // Default file
+  std::string filename = "data/ecg_samples.bin"; // Default file
   
   // Find filename in arguments (skip options)
   for (int i = 1; i < argc; i++) {

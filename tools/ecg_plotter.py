@@ -104,10 +104,14 @@ def plot_ecg(voltages, timestamps, classifications, filename, file_type):
   else:
     time_sec = (timestamps - timestamps[0]) / 1e6
 
+  # Remove DC offset (VCC/2 = 1.65V for 3.3V supply)
+  DC_OFFSET = 1.65
+  voltages_ac = voltages - DC_OFFSET
+
   fig, ax = plt.subplots(figsize=(15, 6), dpi=100)
 
   # Plot do sinal ECG
-  ecg_line = ax.plot(time_sec, voltages, label="ECG Signal", linewidth=1, color='blue')
+  ecg_line = ax.plot(time_sec, voltages_ac, label="ECG Signal", linewidth=1, color='blue')
 
   # Preparar handles e labels para controle da ordem da legenda
   legend_handles = [ecg_line[0]]
@@ -131,7 +135,7 @@ def plot_ecg(voltages, timestamps, classifications, filename, file_type):
         if classification not in classification_groups:
           classification_groups[classification] = {'times': [], 'voltages': []}
         classification_groups[classification]['times'].append(time_sec[i])
-        classification_groups[classification]['voltages'].append(voltages[i])
+        classification_groups[classification]['voltages'].append(voltages_ac[i])
     
     # Plotar na ordem desejada: P, Q, R, S, T
     desired_order = ['P', 'Q', 'R', 'S', 'T']
@@ -191,7 +195,8 @@ def main():
       voltages, timestamps, classifications = read_binary_file(args.filename)
 
     print(f"Successfully loaded {len(voltages)} samples")
-    print(f"Voltage range: {np.min(voltages):.3f}V to {np.max(voltages):.3f}V")
+    voltages_ac = voltages - 1.65
+    print(f"Voltage range (DC removed): {np.min(voltages_ac):.3f}V to {np.max(voltages_ac):.3f}V")
     print(f"Duration: {(timestamps[-1] - timestamps[0]) / 1e6:.2f} seconds")
     
     if classifications is not None:

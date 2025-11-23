@@ -110,7 +110,7 @@ namespace logger {
       initialized_.store(true);
             
       log_internal(Level::kInfo,
-                    "Cardiac Logger initialized: file=%s, level=%d",
+                    "Logger initialized: file=%s, level=%d",
                     log_filename_,
                     static_cast<int>(level));
             

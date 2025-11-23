@@ -22,17 +22,17 @@ namespace config {
                 kSampleRate == 475 || kSampleRate == 860,
                 "[ERROR] - Sample rate must match ADS1115 options.");
 
-  constexpr double kPeriodSeconds {1.0 / kSampleRate};  // 0.004 seconds
-  constexpr int kPeriodUs {static_cast<int>(kPeriodSeconds * 1'000'000)};  // 4000 μs
+  constexpr double kPeriodSeconds {1.0 / kSampleRate};
+  constexpr int kPeriodUs {static_cast<int>(kPeriodSeconds * 1'000'000)};
   constexpr auto kSamplePeriod {std::chrono::microseconds(kPeriodUs)};
   
-  constexpr std::chrono::seconds kAcquisitionDuration {70};
+  constexpr std::chrono::seconds kAcquisitionDuration {60};
   
   constexpr size_t kBufferSize {kSampleRate * kAcquisitionDuration.count()};
   
   constexpr auto kFileWriteInterval {std::chrono::milliseconds(200)};
   
-  constexpr const char* kDefaultLogFile {"cardiac_system.log"};
+  constexpr const char* kDefaultLogFile {"system.log"};
   
 }
 
