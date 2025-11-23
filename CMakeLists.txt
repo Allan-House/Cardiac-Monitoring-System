@@ -40,6 +40,8 @@ set(SOURCES
   src/file_manager.cpp
   src/signal_handler.cpp
   src/tcp_file_server.cpp
+  src/file_data.cpp
+  src/notch_filter.cpp
 )
 
 # Add platform-specific sources
@@ -47,10 +49,6 @@ if(CMAKE_CROSSCOMPILING)
   list(APPEND SOURCES
     src/ads1115.cpp
     src/sensor_data.cpp
-  )
-else()
-  list(APPEND SOURCES
-    src/file_data.cpp
   )
 endif()
 

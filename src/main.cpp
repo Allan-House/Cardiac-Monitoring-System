@@ -14,29 +14,28 @@
 #include "system_monitor.h"
 #include "tcp_file_server.h"
 #include "signal_handler.h"
+#include "file_data.h"
 
 #ifdef USE_HARDWARE_SOURCE
 #include "ads1115.h"
 #include "sensor_data.h"
 #endif
 
-#ifdef USE_FILE_SOURCE
-#include "file_data.h"
-#endif
-
 static Application* g_application = nullptr;
 
-std::shared_ptr<DataSource> createDataSource(int argc, char** argv);
+std::shared_ptr<DataSource> createDataSource(int argc, char** argv, bool force_simulation);
 void print_help(const char* program_name);
 bool parse_arguments(int argc, char** argv,
                     std::string& data_file, 
-                    std::chrono::seconds& duration);
+                    std::chrono::seconds& duration,
+                    bool& force_simulation);
 
 int main(int argc, char** argv) {
   std::string data_file;
   std::chrono::seconds acquisition_duration {config::kAcquisitionDuration};
+  bool force_simulation = false;
 
-  if (!parse_arguments(argc, argv, data_file, acquisition_duration)) {
+  if (!parse_arguments(argc, argv, data_file, acquisition_duration, force_simulation)) {
     return 1;
   }
 
@@ -52,8 +51,8 @@ int main(int argc, char** argv) {
   #endif
   logger::init(config::kDefaultLogFile, log_level);
   
-  // Create data source based on compilation target
-  auto data_source = createDataSource(argc, argv);
+  // Create data source based on compilation target and simulation flag
+  auto data_source = createDataSource(argc, argv, force_simulation);
   
   if (!data_source || !data_source->Available()) {
     std::cerr << "Failed to initialize data source" << std::endl;
@@ -114,27 +113,34 @@ int main(int argc, char** argv) {
 }
 
 void print_help(const char* program_name) {
-  std::cout << "Usage: " << program_name << " [OPTIONS]\n\n";
+  std::cout << "Usage: " << program_name << " [OPTIONS] [FILE]\n\n";
   std::cout << "Cardiac Monitoring System - ECG acquisition and analysis\n\n";
   
   std::cout << "OPTIONS:\n";
-  
-  #ifdef USE_FILE_SOURCE
-    std::cout << "  <filename>              Input ECG data file";
-    std::cout << " (default: data/ecg_samples.bin)\n";
-  #endif
-  
+  std::cout << "  -s, --simulate          Force simulation mode (use file instead of hardware)\n";
   std::cout << "  -d, --duration <sec>    Acquisition duration in seconds";
   std::cout << " (default: " << config::kAcquisitionDuration.count() << ")\n";
   std::cout << "  -h, --help              Show this help message\n\n";
+  
+  std::cout << "ARGUMENTS:\n";
+  std::cout << "  [FILE]                  ECG data file for simulation mode\n";
+  std::cout << "                          (default: data/ecg_samples.bin)\n\n";
+  
+  std::cout << "EXAMPLES:\n";
+  std::cout << "  " << program_name << "                          # Use hardware (if available)\n";
+  std::cout << "  " << program_name << " -s                       # Simulate with default file\n";
+  std::cout << "  " << program_name << " -s my_ecg.bin           # Simulate with specific file\n";
+  std::cout << "  " << program_name << " -s data.bin -d 30       # Simulate for 30 seconds\n";
   
   std::cout << std::endl;
 }
 
 bool parse_arguments(int argc, char** argv,
                      std::string& data_file,
-                     std::chrono::seconds& duration) {
+                     std::chrono::seconds& duration,
+                     bool& force_simulation) {
   duration = config::kAcquisitionDuration;
+  force_simulation = false;
   
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -143,6 +149,12 @@ bool parse_arguments(int argc, char** argv,
     if (arg == "-h" || arg == "--help") {
       print_help(argv[0]);
       exit(0);
+    }
+    
+    // Simulation flag
+    if (arg == "-s" || arg == "--simulate") {
+      force_simulation = true;
+      continue;
     }
     
     // Duration
@@ -158,13 +170,11 @@ bool parse_arguments(int argc, char** argv,
       continue;
     }
     
-    #ifdef USE_FILE_SOURCE
-    // File argument (only for file source builds)
+    // File argument
     if (arg[0] != '-') {
       data_file = arg;
       continue;
     }
-    #endif
     
     // Unknown argument
     std::cerr << "Error: unknown argument '" << arg << "'\n";
@@ -175,8 +185,30 @@ bool parse_arguments(int argc, char** argv,
   return true;
 }
 
-std::shared_ptr<DataSource> createDataSource(int argc, char** argv) {
+std::shared_ptr<DataSource> createDataSource(int argc, char** argv, bool force_simulation) {
+  // If simulation flag is active, always use FileData
+  if (force_simulation) {
+    std::string filename = "data/ecg_samples.bin";
+    
+    // Find filename in arguments (skip options)
+    for (int i = 1; i < argc; i++) {
+      std::string arg = argv[i];
+      if (arg[0] != '-' && arg != "--duration" && arg != "--simulate" &&
+          (i == 0 || (argv[i-1] != std::string("-d") && 
+                      argv[i-1] != std::string("--duration") &&
+                      argv[i-1] != std::string("-s") &&
+                      argv[i-1] != std::string("--simulate")))) {
+        filename = arg;
+        break;
+      }
+    }
+    
+    LOG_INFO("Simulation mode enabled - using file: %s", filename.c_str());
+    return std::make_shared<FileData>(filename);
+  }
+
 #ifdef USE_HARDWARE_SOURCE
+  LOG_INFO("Hardware mode - using ADS1115 sensor");
   auto ads1115 = std::make_shared<ADS1115>();
   return std::make_shared<SensorData>(ads1115);
   
@@ -193,6 +225,7 @@ std::shared_ptr<DataSource> createDataSource(int argc, char** argv) {
     }
   }
   
+  LOG_INFO("File mode - using file: %s", filename.c_str());
   return std::make_shared<FileData>(filename);
   
 #else

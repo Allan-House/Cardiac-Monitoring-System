@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "config.h"
+#include "notch_filter.h"
 #include "ring_buffer.h"
 
 /**
@@ -99,11 +100,15 @@ struct Beat {
  * and temporal windowing. Runs in a separate thread consuming samples
  * from the raw buffer and producing classified samples.
  * 
- * Algorithm overview:
- * 1. Detects R peaks using voltage threshold and refractory period
- * 2. Identifies Q and S waves as minima around R peak (±80ms)
- * 3. Locates P wave as maximum before QRS complex (200ms window)
- * 4. Finds T wave as maximum after QRS complex (400ms window)
+ * Processing pipeline:
+ * 1. Apply notch filter (60 Hz rejection) - optional
+ * 2. Detect R peaks using voltage threshold and refractory period
+ * 3. Identify Q and S waves as minima around R peak (±80ms)
+ * 4. Locate P wave as maximum before QRS complex (200ms window)
+ * 5. Find T wave as maximum after QRS complex (400ms window)
+ * 
+ * @note Raw samples are preserved in binary file, filtered samples
+ *       with classifications are saved to CSV file.
  */
 class ECGAnalyzer {
   private:
@@ -112,6 +117,9 @@ class ECGAnalyzer {
   std::vector<Beat> detected_beats_;
   std::shared_ptr<RingBuffer<Sample>> buffer_raw_;
   std::shared_ptr<RingBuffer<Sample>> buffer_classified_;
+  
+  // Notch filter for power line interference rejection
+  NotchFilter notch_filter_;
   
   // Thread control
   std::atomic<bool> processing_ {false};
@@ -156,6 +164,9 @@ class ECGAnalyzer {
 
   /**
    * @brief Processes single sample through detection pipeline.
+   * 
+   * Applies notch filter (if enabled) and adds to internal buffer
+   * for beat detection and classification.
    * 
    * @param sample Input sample to process
    */

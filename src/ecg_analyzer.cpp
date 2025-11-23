@@ -7,11 +7,28 @@
 ECGAnalyzer::ECGAnalyzer(std::shared_ptr<RingBuffer<Sample>> buffer_raw,
                          std::shared_ptr<RingBuffer<Sample>> buffer_classified)
   : buffer_raw_ {buffer_raw},
-    buffer_classified_ {buffer_classified}
+    buffer_classified_ {buffer_classified},
+    notch_filter_ {config::kNotchCenterFreq, 
+                   static_cast<float>(config::kSampleRate), 
+                   config::kNotchQFactor}
 {
   // Reserve space to avoid reallocations during execution
   samples_.reserve(config::kSampleRate * 2); // 2 seconds at configured rate 
-  detected_beats_.reserve(5);   // // ~2-3 beats max in 2-second window
+  detected_beats_.reserve(5);   // ~2-3 beats max in 2-second window
+  
+  // Initialize notch filter if enabled
+  if (config::kEnableNotchFilter) {
+    if (!notch_filter_.Init()) {
+      LOG_ERROR("Failed to initialize notch filter - filtering will be disabled");
+    } else {
+      LOG_INFO("Notch filter enabled: f0=%.1f Hz, Q=%.1f, BW=%.2f Hz",
+               notch_filter_.get_center_freq(),
+               notch_filter_.get_Q(),
+               notch_filter_.get_bandwidth());
+    }
+  } else {
+    LOG_INFO("Notch filter disabled in configuration");
+  }
 }
 
 
@@ -67,7 +84,17 @@ void ECGAnalyzer::ProcessingLoop() {
 
 
 void ECGAnalyzer::ProcessSample(const Sample& sample) {
-  samples_.push_back(sample);
+  // Apply notch filter if enabled and initialized
+  float voltage = sample.voltage;
+  
+  if (config::kEnableNotchFilter && notch_filter_.IsInitialized()) {
+    voltage = notch_filter_.Process(sample.voltage);
+  }
+  
+  // Create filtered sample (timestamp and classification preserved)
+  Sample filtered_sample{voltage, sample.timestamp, sample.classification};
+  
+  samples_.push_back(filtered_sample);
   
   if (samples_.size() >= 3) {
     DetectRPeaks();
