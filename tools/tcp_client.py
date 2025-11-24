@@ -18,7 +18,6 @@ class CardiacTCPClient:
     self.output_dir = Path(output_dir)
     self.socket = None
     
-    # Create output directory if it doesn't exist
     self.output_dir.mkdir(parents=True, exist_ok=True)
   
   def connect(self):

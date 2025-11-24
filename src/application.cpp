@@ -126,6 +126,10 @@ void Application::AcquisitionLoop() {
   auto end_time {start_time + acquisition_duration_};
   
   uint32_t expected_sample {0};
+  
+  // Variável para rate limiting de warnings - FORA do bloco condicional
+  auto last_warning_time = std::chrono::steady_clock::time_point::min();
+  
   #ifdef DEBUG
   auto last_log_time {start_time};
   #endif
@@ -164,12 +168,23 @@ void Application::AcquisitionLoop() {
       }
       #endif
 
-      // Auto-correction: if too late, skip a sample
+      // Auto-correction: if too late, resync
       auto delay {std::chrono::duration_cast<std::chrono::microseconds>(now - target_time).count()};
       
-      if (delay > 2000) { // If more than 2ms late
-        LOG_WARN("High delay detected: %ldμs, skipping to catch up", delay);
-        expected_sample = std::chrono::duration_cast<std::chrono::microseconds>(now - start_time).count() / 4000;
+      if (delay > 10000) { // 10ms threshold
+        auto time_since_warning = std::chrono::duration_cast<std::chrono::seconds>(
+          now - last_warning_time).count();
+        
+        // Rate limit warnings to once per second
+        if (time_since_warning >= 1) {
+          LOG_WARN("Significant delay detected: %ldμs, resyncing", delay);
+          last_warning_time = now;
+        }
+        
+        // Resync based on actual elapsed time and configured sample rate
+        auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(
+          now - start_time).count();
+        expected_sample = elapsed_us / config::kPeriodUs;
       }
     }
   } catch (const std::exception& e) {

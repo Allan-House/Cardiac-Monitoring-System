@@ -34,10 +34,9 @@ namespace config {
   
   constexpr const char* kDefaultLogFile {"system.log"};
   
-  // Notch filter configuration
-  constexpr bool kEnableNotchFilter {true};          // Enable/disable notch filtering
-  constexpr float kNotchCenterFreq {60.0f};          // Center frequency (Hz) - power line interference
-  constexpr float kNotchQFactor {30.0f};             // Quality factor (Q = f0/BW)
+  constexpr bool kEnableNotchFilter {false};
+  constexpr float kNotchCenterFreq {60.0f};
+  constexpr float kNotchQFactor {30.0f};
   
   static_assert(kNotchCenterFreq > 0.0f && kNotchCenterFreq < (kSampleRate / 2.0f),
                 "[ERROR] - Notch center frequency must be between 0 and Nyquist frequency.");
