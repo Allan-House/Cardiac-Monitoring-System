@@ -131,6 +131,14 @@ class Application {
   void AcquisitionLoop();
 
   /**
+   * @brief Updates progress bar display during acquisition.
+   * 
+   * @param elapsed Elapsed time in seconds
+   * @param total Total acquisition duration in seconds
+   */
+  void UpdateProgressBar(uint64_t elapsed, uint64_t total);
+  
+  /**
    * @brief Performs coordinated shutdown of all components.
    * 
    * Shutdown sequence:
