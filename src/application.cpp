@@ -126,7 +126,8 @@ void Application::AcquisitionLoop() {
   auto end_time {start_time + acquisition_duration_};
   
   uint32_t expected_sample {0};
-  #ifdef DEBUG
+  
+  auto last_warning_time = std::chrono::steady_clock::time_point::min();
   auto last_log_time {start_time};
 
   try {
@@ -162,23 +163,8 @@ void Application::AcquisitionLoop() {
       }
 
       // Auto-correction: if too late, resync
-      // Auto-correction: if too late, resync
       auto delay {std::chrono::duration_cast<std::chrono::microseconds>(now - target_time).count()};
       
-      if (delay > 10000) { // 10ms threshold
-        auto time_since_warning = std::chrono::duration_cast<std::chrono::seconds>(
-          now - last_warning_time).count();
-        
-        // Rate limit warnings to once per second
-        if (time_since_warning >= 1) {
-          LOG_WARN("Significant delay detected: %ldμs, resyncing", delay);
-          last_warning_time = now;
-        }
-        
-        // Resync based on actual elapsed time and configured sample rate
-        auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(
-          now - start_time).count();
-        expected_sample = elapsed_us / config::kPeriodUs;
       if (delay > 10000) { // 10ms threshold
         auto time_since_warning = std::chrono::duration_cast<std::chrono::seconds>(
           now - last_warning_time).count();
@@ -212,6 +198,27 @@ void Application::AcquisitionLoop() {
   buffer_raw_->Shutdown();
   
   LOG_INFO("Acquisition loop finished");
+}
+
+
+void Application::UpdateProgressBar(uint64_t elapsed, uint64_t total) {
+  constexpr int bar_width = 50;
+  float progress = static_cast<float>(elapsed) / static_cast<float>(total);
+  int pos = static_cast<int>(bar_width * progress);
+  
+  std::cout << "\r[";
+  for (int i = 0; i < bar_width; ++i) {
+    if (i < pos) std::cout << "=";
+    else if (i == pos) std::cout << ">";
+    else std::cout << " ";
+  }
+  std::cout << "] " << static_cast<int>(progress * 100.0) << "% "
+            << "(" << elapsed << "/" << total << "s)";
+  std::cout << std::flush;
+  
+  if (elapsed >= total) {
+    std::cout << std::endl;
+  }
 }
 
 
@@ -258,27 +265,6 @@ void Application::GracefulShutdown() {
   #endif
   
   LOG_SUCCESS("Graceful shutdown completed");
-}
-
-
-void Application::UpdateProgressBar(uint64_t elapsed, uint64_t total) {
-  constexpr int bar_width = 50;
-  float progress = static_cast<float>(elapsed) / static_cast<float>(total);
-  int pos = static_cast<int>(bar_width * progress);
-  
-  std::cout << "\r[";
-  for (int i = 0; i < bar_width; ++i) {
-    if (i < pos) std::cout << "=";
-    else if (i == pos) std::cout << ">";
-    else std::cout << " ";
-  }
-  std::cout << "] " << static_cast<int>(progress * 100.0) << "% "
-            << "(" << elapsed << "/" << total << "s)";
-  std::cout << std::flush;
-  
-  if (elapsed >= total) {
-    std::cout << std::endl;
-  }
 }
 
 
